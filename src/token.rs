@@ -38,6 +38,6 @@ pub enum Token {
     LBracket,
     RBracket,
     Eof,
-    Illegal,
+    Illegal(char),
     Bang,
 }

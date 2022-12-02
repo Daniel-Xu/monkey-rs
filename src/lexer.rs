@@ -31,16 +31,15 @@ impl Lexer {
             Some(&c) => c,
             None => '\0',
         };
-
         self.cur_pos = self.next_pos;
         self.next_pos += 1;
     }
 
     fn peek_char(&self) -> char {
-        return match self.input.get(self.next_pos) {
+        match self.input.get(self.next_pos) {
             Some(&c) => c,
             None => '\0',
-        };
+        }
     }
 
     fn is_letter(&self) -> bool {
@@ -138,12 +137,9 @@ impl Lexer {
             }
             c if c.is_digit(10) => return Token::Int(self.read_number()),
 
-            c if c == '\'' || c == '\"' => Token::Str(self.read_string()),
+            c if c == '\'' || c == '"' => Token::Str(self.read_string()),
 
-            _ => {
-                println!("{:?}", self.cur_char);
-                Token::Illegal
-            }
+            c => Token::Illegal(c),
         };
 
         self.read_char();
@@ -156,7 +152,11 @@ impl Lexer {
 impl Iterator for Lexer {
     type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.next_token())
+        if self.cur_pos < self.input.len() {
+            Some(self.next_token())
+        } else {
+            None
+        }
     }
 }
 
@@ -168,7 +168,6 @@ mod test_lexer {
         let lexer = Lexer::new(input.to_string());
 
         for (tok, expected) in lexer.zip(tokens.iter()) {
-            // println!("{:?}, {:?}", tok, expected);
             assert_eq!(*expected, tok);
         }
     }
