@@ -1,6 +1,7 @@
+mod ast;
 mod lexer;
+mod parser;
 mod token;
-
 // use clap::Parser;
 
 // #[derive(Parser, Debug)]

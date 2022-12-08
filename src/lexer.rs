@@ -97,7 +97,7 @@ impl Lexer {
         };
     }
 
-    fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
         let rval = match self.cur_char {
             '=' => match self.peek_char() {
