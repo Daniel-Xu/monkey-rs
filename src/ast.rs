@@ -1,16 +1,22 @@
 // use crate::lexer::Lexer;
 // use crate::parser::Parser;
 
+use crate::token::Token;
+
+// this is the expr
 #[derive(Debug, PartialEq)]
 pub enum Expr {
     Identifier(String),
-    Integer(usize),
+    Integer(u32),
     Boolean(bool),
+    Prefix(Token, Box<Expr>), // token, right
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
     Let(String, Expr),
+    Return(Expr),
+    Expression(Expr), // this is expression stmt
 }
 
 #[derive(Debug, PartialEq)]

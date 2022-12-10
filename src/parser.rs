@@ -1,9 +1,35 @@
 use crate::ast::{Expr, Program, Stmt};
 use crate::lexer::Lexer;
 use crate::token::Token;
+use crate::token::Token::Int;
 
 #[derive(Debug)]
-enum ParserError {}
+enum ParserError {
+    ExpectedIdent(Token),
+    ExpectedAssign(Token),
+    ExpectedLParen(Token),
+    ExpectedRParen(Token),
+    ExpectedLBrace(Token),
+    ExpectedRBracket(Token),
+    ExpectedColon(Token),
+    ExpectedComma(Token),
+    ExpectedToken { expected: Token, got: Token },
+    ExpectedRBrace(Token),
+    ExpectedPrefixToken(Token),
+    UnknownError,
+}
+
+enum Precedence {
+    LOWEST,
+    EQUAL,
+    CALL,
+    PREFIX,
+    PRODUCT,
+    SUM,
+    LESSGREATER,
+}
+
+type Result<T> = std::result::Result<T, ParserError>;
 
 pub struct Parser {
     lexer: Lexer,
@@ -43,8 +69,8 @@ impl Parser {
             let stmt = self.parse_stmt();
 
             match stmt {
-                Some(stmt) => program.statements.push(stmt),
-                _ => (),
+                Ok(stmt) => program.statements.push(stmt),
+                Err(error) => self.errors.push(error),
             }
 
             self.next_token();
@@ -53,57 +79,106 @@ impl Parser {
         program
     }
 
-    pub fn parse_stmt(&mut self) -> Option<Stmt> {
+    pub fn parse_stmt(&mut self) -> Result<Stmt> {
         match self.cur_token {
             Token::Let => self.parse_let_statement(),
-            _ => None,
+            Token::Return => self.parse_return_statement(),
+            _ => self.parse_expr_statement(),
         }
-    }
-
-    fn peek_token_is(&self, input: Token) -> bool {
-        self.peek_token == input
     }
 
     fn cur_token_is(&self, input: Token) -> bool {
         self.cur_token == input
     }
 
-    fn expect_peek(&mut self, input: Token) -> bool {
-        return if self.peek_token_is(input) {
+    fn expect_peek<F>(&mut self, input: Token, error_constructor: F) -> Result<()>
+    where
+        F: Fn(Token) -> ParserError,
+    {
+        let peek = self.peek_token.clone();
+        if peek == input {
             self.next_token();
-            true
+            Ok(())
         } else {
-            false
-        };
+            Err(error_constructor(peek))
+        }
     }
 
-    fn parse_let_statement(&mut self) -> Option<Stmt> {
+    fn parse_prefix_expr(&mut self) -> Result<Expr> {
+        let cur_token = self.cur_token.clone();
+        self.next_token();
+        let right = self.parse_expr(Precedence::PREFIX)?;
+        Ok(Expr::Prefix(cur_token, Box::new(right)))
+    }
+
+    fn parse_prefix(&self) -> Result<Expr> {
+        // why can't self move here
+        match &self.cur_token {
+            // why we need clone here
+            Token::Ident(id) => Ok(Expr::Identifier(id.clone())),
+            Token::Int(u) => Ok(Expr::Integer(*u)),
+            Token::Bang | Token::Minus => self.parse_prefix_expr(),
+            t => Err(ParserError::ExpectedPrefixToken(t.clone())),
+        }
+    }
+
+    // This is the entry of all expressions
+    // we have prefix
+    // infix
+    fn parse_expr(&mut self, precedence: Precedence) -> Result<Expr> {
+        // find prefix
+        let prefix = self.parse_prefix()?;
+
+        // if prefix {
+        //     return Err(ParserError::UnknownError);
+        // }
+        Ok(Expr::Integer(1))
+    }
+
+    fn parse_expr_statement(&mut self) -> Result<Stmt> {
+        // expr
+        let expr = self.parse_expr(Precedence::LOWEST)?;
+
+        if self.cur_token_is(Token::Semicolon) {
+            self.next_token();
+        }
+
+        // return
+        Ok(Stmt::Expression(expr))
+    }
+
+    fn parse_return_statement(&mut self) -> Result<Stmt> {
+        // handle expr
+        self.next_token();
+
+        // expr
+        while !self.cur_token_is(Token::Semicolon) {
+            self.next_token()
+        }
+        // return
+        Ok(Stmt::Return(Expr::Integer(31)))
+    }
+
+    fn parse_let_statement(&mut self) -> Result<Stmt> {
         let id: String;
         // handle identifier
         if let Token::Ident(ident) = self.peek_token.clone() {
             id = ident;
             self.next_token();
         } else {
-            return None;
+            return Err(ParserError::ExpectedIdent(self.peek_token.clone()));
         }
 
         // handle =
-
-        if !self.expect_peek(Token::Assign) {
-            return None;
-        }
+        self.expect_peek(Token::Assign, ParserError::ExpectedAssign)?;
 
         // handle expr
         while !self.cur_token_is(Token::Semicolon) {
             self.next_token()
         }
         // return
-        Some(Stmt::Let(id, Expr::Integer(31)))
+        Ok(Stmt::Let(id, Expr::Integer(31)))
     }
-
-    // fn peek_error(&mut self) {
-    //     self.errors.push();
-    // }
 
     fn check_parser_errors(&self) {
         if self.errors.is_empty() {
@@ -153,27 +228,27 @@ mod test_parser_statements {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_return_statements() {
-    //     let input = r"return 5;
-    //                        return 2 + 3;";
-    //
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_program();
-    //     parser.check_parser_errors();
-    //
-    //     let expected = vec![
-    //         Stmt::Return(Expr::Integer(5)),
-    //         Stmt::Return(Expr::Infix(
-    //             Box::new(Expr::Integer(2)),
-    //             Token::Plus,
-    //             Box::new(Expr::Integer(3)),
-    //         )),
-    //     ];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_return_statements() {
+        let input = r"return 5;
+                           return 2 + 3;";
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        parser.check_parser_errors();
+
+        let expected = vec![
+            Stmt::Return(Expr::Integer(5)),
+            Stmt::Return(Expr::Infix(
+                Box::new(Expr::Integer(2)),
+                Token::Plus,
+                Box::new(Expr::Integer(3)),
+            )),
+        ];
+
+        assert_eq!(program.statements, expected);
+    }
 }
 
 // #[cfg(test)]
