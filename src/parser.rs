@@ -1,10 +1,10 @@
 use crate::ast::{Expr, Program, Stmt};
 use crate::lexer::Lexer;
-use crate::token::Token;
-use crate::token::Token::Int;
+use crate::token::Token::{self, *};
+use Precedence::*;
 
 #[derive(Debug)]
-enum ParserError {
+pub enum ParserError {
     ExpectedIdent(Token),
     ExpectedAssign(Token),
     ExpectedLParen(Token),
@@ -19,14 +19,30 @@ enum ParserError {
     UnknownError,
 }
 
+#[derive(PartialEq, PartialOrd)]
 enum Precedence {
-    LOWEST,
-    EQUAL,
-    CALL,
-    PREFIX,
-    PRODUCT,
-    SUM,
-    LESSGREATER,
+    Lowest,
+    Equals,      // ==, !=
+    LessGreater, // >, <
+    Sum,         // +, -
+    Product,     // *, /
+    Prefix,      // -x, !true
+    Call,        // myFunction(x)
+    Index,       // myArray[2]
+}
+
+impl Precedence {
+    fn from_token(token: &Token) -> Self {
+        match token {
+            Plus | Minus => Sum,
+            Asterisk | Slash => Product,
+            Lt | Gt => LessGreater,
+            Eq | NotEq => Equals,
+            LParen => Call,
+            LBracket => Index,
+            _ => Lowest,
+        }
+    }
 }
 
 type Result<T> = std::result::Result<T, ParserError>;
@@ -91,6 +107,10 @@ impl Parser {
         self.cur_token == input
     }
 
+    fn peek_token_is(&self, input: Token) -> bool {
+        self.peek_token == input
+    }
+
     fn expect_peek<F>(&mut self, input: Token, error_constructor: F) -> Result<()>
     where
         F: Fn(Token) -> ParserError,
@@ -107,37 +127,70 @@ impl Parser {
     fn parse_prefix_expr(&mut self) -> Result<Expr> {
         let cur_token = self.cur_token.clone();
         self.next_token();
-        let right = self.parse_expr(Precedence::PREFIX)?;
+        let right = self.parse_expr(Prefix)?;
         Ok(Expr::Prefix(cur_token, Box::new(right)))
     }
 
-    fn parse_prefix(&self) -> Result<Expr> {
+    fn parse_prefix(&mut self) -> Result<Expr> {
         // why can't self move here
         match &self.cur_token {
             // why we need clone here
             Token::Ident(id) => Ok(Expr::Identifier(id.clone())),
+            Token::True => Ok(Expr::Boolean(true)),
+            Token::False => Ok(Expr::Boolean(false)),
             Token::Int(u) => Ok(Expr::Integer(*u)),
             Token::Bang | Token::Minus => self.parse_prefix_expr(),
             t => Err(ParserError::ExpectedPrefixToken(t.clone())),
         }
     }
 
+    fn parse_infix(&mut self, left: Expr) -> Result<Expr> {
+        // why can't self move here
+        let cur_token = self.cur_token.clone();
+        let cur_precedence = Precedence::from_token(&self.cur_token);
+
+        // we move to the starting of next expression
+        self.next_token();
+        let right = self.parse_expr(cur_precedence)?;
+
+        Ok(Expr::Infix(Box::new(left), cur_token, Box::new(right)))
+    }
+
+    fn maybe_skip_semicolon(&mut self) {
+        if self.peek_token_is(Semicolon) {
+            self.next_token();
+        }
+    }
+
     // This is the entry of all expressions
     // we have prefix
     // infix
+    // the basic algorithm is simple
+    // we start to parse with a lowest precedence
+    // if we found more content, we need to keep parsing infix
+    // if the infix precedence is smaller than current precedence, we need to stop
+    // and let the upper stack to drive the process again
+    // inside the parse_infix, we need to parse the expression again.
     fn parse_expr(&mut self, precedence: Precedence) -> Result<Expr> {
         // find prefix
-        let prefix = self.parse_prefix()?;
+        let mut prefix = self.parse_prefix()?;
 
-        // if prefix {
-        //     return Err(ParserError::UnknownError);
-        // }
-        Ok(Expr::Integer(1))
+        // 5 + 3 * 2
+        // ^ we are here
+        while !self.peek_token_is(Token::Semicolon)
+            && precedence < Precedence::from_token(&self.peek_token)
+        {
+            // we jump to the operator +, and start to parse the infix expression
+            self.next_token();
+            prefix = self.parse_infix(prefix)?;
+        }
+
+        Ok(prefix)
     }
 
     fn parse_expr_statement(&mut self) -> Result<Stmt> {
         // expr
-        let expr = self.parse_expr(Precedence::LOWEST)?;
+        let expr = self.parse_expr(Lowest)?;
 
         if self.cur_token_is(Token::Semicolon) {
             self.next_token();
@@ -151,14 +204,15 @@ impl Parser {
         // handle expr
         self.next_token();
 
-        // expr
-        while !self.cur_token_is(Token::Semicolon) {
-            self.next_token()
-        }
-        // return
-        Ok(Stmt::Return(Expr::Integer(31)))
+        let expr = self.parse_expr(Lowest)?;
+
+        self.maybe_skip_semicolon();
+
+        Ok(Stmt::Return(expr))
     }
 
+    // let x = 5
+    // ^
     fn parse_let_statement(&mut self) -> Result<Stmt> {
         let id: String;
         // handle identifier
@@ -171,13 +225,12 @@ impl Parser {
 
         // handle =
         self.expect_peek(Token::Assign, ParserError::ExpectedAssign)?;
+        self.next_token();
 
-        // handle expr
-        while !self.cur_token_is(Token::Semicolon) {
-            self.next_token()
-        }
-        // return
-        Ok(Stmt::Let(id, Expr::Integer(31)))
+        let expr = self.parse_expr(Lowest)?;
+        self.maybe_skip_semicolon();
+
+        Ok(Stmt::Let(id, expr))
     }
 
     fn check_parser_errors(&self) {
@@ -193,16 +246,16 @@ impl Parser {
     }
 }
 
-// #[cfg(test)]
-// mod test_precidence {
-//     use super::*;
-//
-//     #[test]
-//     fn test_ord() {
-//         assert!(Precedence::Lowest < Precedence::Equals);
-//         assert!(Precedence::Equals > Precedence::Lowest);
-//     }
-// }
+#[cfg(test)]
+mod test_precidence {
+    use super::*;
+
+    #[test]
+    fn test_ord() {
+        assert!(Precedence::Lowest < Precedence::Equals);
+        assert!(Precedence::Equals > Precedence::Lowest);
+    }
+}
 
 #[cfg(test)]
 mod test_parser_statements {

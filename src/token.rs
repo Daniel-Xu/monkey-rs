@@ -19,8 +19,7 @@ pub enum Token {
     Comma,
     Colon,
 
-    // operator
-    Assign,
+    // operators which have precedence
     Plus,
     Minus,
     Asterisk,
@@ -31,6 +30,7 @@ pub enum Token {
     NotEq,
 
     // special char
+    Assign,
     LParen,
     RParen,
     LBrace,

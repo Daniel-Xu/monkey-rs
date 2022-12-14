@@ -9,7 +9,8 @@ pub enum Expr {
     Identifier(String),
     Integer(u32),
     Boolean(bool),
-    Prefix(Token, Box<Expr>), // token, right
+    Prefix(Token, Box<Expr>),           // token, right
+    Infix(Box<Expr>, Token, Box<Expr>), //left, token, right // TODO: change this to struct
 }
 
 #[derive(Debug, PartialEq)]
