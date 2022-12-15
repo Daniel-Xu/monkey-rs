@@ -19,14 +19,19 @@ use crate::lexer::Lexer;
 use std::io::{self, BufRead};
 
 fn main() {
-    let stdin = io::stdin();
-    // std error is unbuffered!!!
-    eprint!(">>> ");
-    for line in stdin.lock().lines() {
-        let l = Lexer::new(line.unwrap());
-        for element in l {
-            println!("the value is: {:?}", element);
-        }
-        eprint!(">>> ");
-    }
+    let x = 5;
+    let y = &x;
+
+    println!("{}", y + 1);
+
+    // let stdin = io::stdin();
+    // // std error is unbuffered!!!
+    // eprint!(">>> ");
+    // for line in stdin.lock().lines() {
+    //     let l = Lexer::new(line.unwrap());
+    //     for element in l {
+    //         println!("the value is: {:?}", element);
+    //     }
+    //     eprint!(">>> ");
+    // }
 }

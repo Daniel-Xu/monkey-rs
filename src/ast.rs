@@ -2,6 +2,7 @@
 // use crate::parser::Parser;
 
 use crate::token::Token;
+use std::fmt::{Display, Formatter};
 
 // this is the expr
 #[derive(Debug, PartialEq)]
@@ -23,6 +24,12 @@ pub enum Stmt {
 #[derive(Debug, PartialEq)]
 pub struct Program {
     pub statements: Vec<Stmt>,
+}
+
+impl Display for Program {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 impl Program {
