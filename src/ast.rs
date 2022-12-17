@@ -10,8 +10,11 @@ pub enum Expr {
     Identifier(String),
     Integer(u32),
     Boolean(bool),
-    Prefix(Token, Box<Expr>),           // token, right
-    Infix(Box<Expr>, Token, Box<Expr>), //left, token, right // TODO: change this to struct
+    Prefix(Token, Box<Expr>),                    // token, right
+    Infix(Box<Expr>, Token, Box<Expr>),          //left, token, right // TODO: change this to struct
+    If(Box<Expr>, BlockStmt, Option<BlockStmt>), // condition blocks blocks
+    Function(Vec<Expr>, BlockStmt),              // parameter, blocks
+    Call(Box<Expr>, Vec<Expr>),                  //identifer, parameter
 }
 
 #[derive(Debug, PartialEq)]
@@ -24,6 +27,20 @@ pub enum Stmt {
 #[derive(Debug, PartialEq)]
 pub struct Program {
     pub statements: Vec<Stmt>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BlockStmt {
+    pub statements: Vec<Stmt>,
+}
+
+impl BlockStmt {
+    pub fn new() -> Self {
+        Self { statements: vec![] }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.statements.is_empty()
+    }
 }
 
 impl Display for Program {

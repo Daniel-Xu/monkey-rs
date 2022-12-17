@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Program, Stmt};
+use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::lexer::Lexer;
 use crate::token::Token::{self, *};
 use Precedence::*;
@@ -111,7 +111,10 @@ impl Parser {
         self.peek_token == input
     }
 
-    fn expect_peek<F>(&mut self, input: Token, error_constructor: F) -> Result<()>
+    /*
+     * After this method, the cur_token will be the token passed in
+     */
+    fn move_to_peek<F>(&mut self, input: Token, error_constructor: F) -> Result<()>
     where
         F: Fn(Token) -> ParserError,
     {
@@ -141,6 +144,7 @@ impl Parser {
             Token::Int(u) => Ok(Expr::Integer(*u)),
             Token::Bang | Token::Minus => self.parse_prefix_expr(),
             Token::LParen => self.parse_group_expr(),
+            Token::If => self.parse_if(),
             t => Err(ParserError::ExpectedPrefixToken(t.clone())),
         }
     }
@@ -193,10 +197,6 @@ impl Parser {
         // expr
         let expr = self.parse_expr(Lowest)?;
 
-        if self.cur_token_is(Token::Semicolon) {
-            self.next_token();
-        }
-
         self.maybe_skip_semicolon();
 
         // return
@@ -227,7 +227,7 @@ impl Parser {
         }
 
         // handle =
-        self.expect_peek(Token::Assign, ParserError::ExpectedAssign)?;
+        self.move_to_peek(Token::Assign, ParserError::ExpectedAssign)?;
         self.next_token();
 
         let expr = self.parse_expr(Lowest)?;
@@ -255,8 +255,44 @@ impl Parser {
          *  the current AST. we need to check the next token is `(`
          */
         let current = self.parse_expr(Lowest)?;
-        self.expect_peek(Token::RParen, ParserError::ExpectedRParen)?;
+        self.move_to_peek(Token::RParen, ParserError::ExpectedRParen)?;
         Ok(current)
+    }
+
+    fn parse_block(&mut self) -> Result<BlockStmt> {
+        // skip {
+        self.next_token();
+
+        let mut block = BlockStmt::new();
+        while !self.cur_token_is(RBrace) && !self.cur_token_is(Token::Eof) {
+            let stmt = self.parse_stmt()?;
+            block.statements.push(stmt);
+            self.next_token();
+        }
+
+        Ok(block)
+    }
+
+    fn parse_if(&mut self) -> Result<Expr> {
+        // skip if
+        self.move_to_peek(Token::LParen, ParserError::ExpectedLParen);
+
+        // parse (xxx), cur_token will be )
+        let condition = self.parse_expr(Lowest)?;
+        self.move_to_peek(Token::LBrace, ParserError::ExpectedLBrace)?;
+
+        let if_block = self.parse_block()?;
+
+        let else_block = if self.peek_token_is(Token::Else) {
+            self.next_token(); // move to else
+            self.move_to_peek(Token::LBrace, ParserError::ExpectedLBrace)?;
+
+            Some(self.parse_block()?)
+        } else {
+            None
+        };
+
+        Ok(Expr::If(Box::new(condition), if_block, else_block))
     }
 }
 
@@ -629,55 +665,55 @@ mod test_parser_expressions {
     //     }
     // }
 
-    // #[test]
-    // fn test_if_expression() {
-    //     let input = "if (x < y) { x }";
-    //
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_program();
-    //     parser.check_parser_errors();
-    //
-    //     let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::If(
-    //         Box::new(Expr::Infix(
-    //             Box::new(Expr::Identifier("x".to_string())),
-    //             Token::Lt,
-    //             Box::new(Expr::Identifier("y".to_string())),
-    //         )),
-    //         BlockStmt {
-    //             statements: vec![Stmt::Expression(Expr::Identifier("x".to_string()))],
-    //         },
-    //         None,
-    //     ))];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x }";
 
-    // #[test]
-    // fn test_if_else_expression() {
-    //     let input = "if (x < y) { x } else { y }";
-    //
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_program();
-    //     parser.check_parser_errors();
-    //
-    //     let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::If(
-    //         Box::new(Expr::Infix(
-    //             Box::new(Expr::Identifier("x".to_string())),
-    //             Token::Lt,
-    //             Box::new(Expr::Identifier("y".to_string())),
-    //         )),
-    //         BlockStmt {
-    //             statements: vec![Stmt::Expression(Expr::Identifier("x".to_string()))],
-    //         },
-    //         Some(BlockStmt {
-    //             statements: vec![Stmt::Expression(Expr::Identifier("y".to_string()))],
-    //         }),
-    //     ))];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        parser.check_parser_errors();
+
+        let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::If(
+            Box::new(Expr::Infix(
+                Box::new(Expr::Identifier("x".to_string())),
+                Token::Lt,
+                Box::new(Expr::Identifier("y".to_string())),
+            )),
+            BlockStmt {
+                statements: vec![Stmt::Expression(Expr::Identifier("x".to_string()))],
+            },
+            None,
+        ))];
+
+        assert_eq!(program.statements, expected);
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y) { x } else { y }";
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        parser.check_parser_errors();
+
+        let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::If(
+            Box::new(Expr::Infix(
+                Box::new(Expr::Identifier("x".to_string())),
+                Token::Lt,
+                Box::new(Expr::Identifier("y".to_string())),
+            )),
+            BlockStmt {
+                statements: vec![Stmt::Expression(Expr::Identifier("x".to_string()))],
+            },
+            Some(BlockStmt {
+                statements: vec![Stmt::Expression(Expr::Identifier("y".to_string()))],
+            }),
+        ))];
+
+        assert_eq!(program.statements, expected);
+    }
 
     // #[test]
     // fn test_function_literal_parsing() {

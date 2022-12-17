@@ -31,11 +31,11 @@ pub enum Token {
 
     // special char
     Assign,
-    LParen,
+    LParen, // (
     RParen,
-    LBrace,
+    LBrace, // {
     RBrace,
-    LBracket,
+    LBracket, // [
     RBracket,
     Eof,
     Illegal(char),

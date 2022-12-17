@@ -17,12 +17,13 @@ mod token;
 
 use crate::lexer::Lexer;
 use std::io::{self, BufRead};
+use std::mem::size_of;
 
 fn main() {
-    let x = 5;
-    let y = &x;
+    let a = '\0';
+    let b = '0';
 
-    println!("{}", y + 1);
+    println!("{:?} {:?}", size_of::<char>(), b);
 
     // let stdin = io::stdin();
     // // std error is unbuffered!!!
