@@ -1,3 +1,5 @@
+extern crate core;
+
 mod ast;
 mod lexer;
 mod parser;
@@ -20,10 +22,10 @@ use std::io::{self, BufRead};
 use std::mem::size_of;
 
 fn main() {
-    let a = '\0';
-    let b = '0';
-
-    println!("{:?} {:?}", size_of::<char>(), b);
+    // let a = '\0';
+    // let b = '0';
+    //
+    // println!("{:?} {:?}", size_of::<char>(), b);
 
     // let stdin = io::stdin();
     // // std error is unbuffered!!!

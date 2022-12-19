@@ -145,6 +145,7 @@ impl Parser {
             Token::Bang | Token::Minus => self.parse_prefix_expr(),
             Token::LParen => self.parse_group_expr(),
             Token::If => self.parse_if(),
+            Token::Function => self.parse_funcion_literal(),
             t => Err(ParserError::ExpectedPrefixToken(t.clone())),
         }
     }
@@ -275,7 +276,7 @@ impl Parser {
 
     fn parse_if(&mut self) -> Result<Expr> {
         // skip if
-        self.move_to_peek(Token::LParen, ParserError::ExpectedLParen);
+        self.move_to_peek(Token::LParen, ParserError::ExpectedLParen)?;
 
         // parse (xxx), cur_token will be )
         let condition = self.parse_expr(Lowest)?;
@@ -293,6 +294,55 @@ impl Parser {
         };
 
         Ok(Expr::If(Box::new(condition), if_block, else_block))
+    }
+
+    fn parse_funcion_literal(&mut self) -> Result<Expr> {
+        // fn(x, y) { x + y; }
+        self.move_to_peek(Token::LParen, ParserError::ExpectedLParen)?;
+        let args = self.parse_args()?;
+
+        self.move_to_peek(Token::LBrace, ParserError::ExpectedLBrace)?;
+
+        let body = self.parse_block()?;
+
+        Ok(Expr::Function(args, body))
+    }
+
+    fn parse_args(&mut self) -> Result<Vec<Expr>> {
+        let mut args = vec![];
+
+        // ()
+        //  ^
+        // (x, y)
+        //  ^
+        self.next_token();
+        if self.cur_token_is(Token::RParen) {
+            return Ok(args);
+        };
+
+        let arg = match &self.cur_token {
+            // why do we need clone here
+            Token::Ident(s) => Expr::Identifier(s.clone()),
+            t => return Err(ParserError::ExpectedIdent(t.clone())), // TODO clone?
+        };
+
+        args.push(arg);
+
+        while self.peek_token_is(Token::Comma) {
+            self.next_token();
+            self.next_token();
+
+            let arg = match &self.cur_token {
+                // why do we need clone here
+                Token::Ident(s) => Expr::Identifier(s.clone()),
+                t => return Err(ParserError::ExpectedIdent(t.clone())), // TODO clone?
+            };
+            args.push(arg);
+        }
+
+        self.move_to_peek(Token::RParen, ParserError::ExpectedRParen)?;
+
+        Ok(args)
     }
 }
 
@@ -715,61 +765,61 @@ mod test_parser_expressions {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_function_literal_parsing() {
-    //     let input = "fn(x, y) { x + y; }";
-    //
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_program();
-    //     parser.check_parser_errors();
-    //
-    //     let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Function(
-    //         vec![
-    //             Expr::Identifier("x".to_string()),
-    //             Expr::Identifier("y".to_string()),
-    //         ],
-    //         BlockStmt {
-    //             statements: vec![Stmt::Expression(Expr::Infix(
-    //                 Box::new(Expr::Identifier("x".to_string())),
-    //                 Token::Plus,
-    //                 Box::new(Expr::Identifier("y".to_string())),
-    //             ))],
-    //         },
-    //     ))];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_function_literal_parsing() {
+        let input = "fn(x, y) { x + y; }";
 
-    // #[test]
-    // fn test_function_parameter_parsing() {
-    //     let input = "fn() {};
-    //                       fn(x) {};
-    //                       fn(x, y, z) {};";
-    //
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_program();
-    //     parser.check_parser_errors();
-    //
-    //     let expected: Vec<Stmt> = vec![
-    //         Stmt::Expression(Expr::Function(vec![], BlockStmt { statements: vec![] })),
-    //         Stmt::Expression(Expr::Function(
-    //             vec![Expr::Identifier("x".to_string())],
-    //             BlockStmt { statements: vec![] },
-    //         )),
-    //         Stmt::Expression(Expr::Function(
-    //             vec![
-    //                 Expr::Identifier("x".to_string()),
-    //                 Expr::Identifier("y".to_string()),
-    //                 Expr::Identifier("z".to_string()),
-    //             ],
-    //             BlockStmt { statements: vec![] },
-    //         )),
-    //     ];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        parser.check_parser_errors();
+
+        let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Function(
+            vec![
+                Expr::Identifier("x".to_string()),
+                Expr::Identifier("y".to_string()),
+            ],
+            BlockStmt {
+                statements: vec![Stmt::Expression(Expr::Infix(
+                    Box::new(Expr::Identifier("x".to_string())),
+                    Token::Plus,
+                    Box::new(Expr::Identifier("y".to_string())),
+                ))],
+            },
+        ))];
+
+        assert_eq!(program.statements, expected);
+    }
+
+    #[test]
+    fn test_function_parameter_parsing() {
+        let input = "fn() {};
+                          fn(x) {};
+                          fn(x, y, z) {};";
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        parser.check_parser_errors();
+
+        let expected: Vec<Stmt> = vec![
+            Stmt::Expression(Expr::Function(vec![], BlockStmt { statements: vec![] })),
+            Stmt::Expression(Expr::Function(
+                vec![Expr::Identifier("x".to_string())],
+                BlockStmt { statements: vec![] },
+            )),
+            Stmt::Expression(Expr::Function(
+                vec![
+                    Expr::Identifier("x".to_string()),
+                    Expr::Identifier("y".to_string()),
+                    Expr::Identifier("z".to_string()),
+                ],
+                BlockStmt { statements: vec![] },
+            )),
+        ];
+
+        assert_eq!(program.statements, expected);
+    }
 
     // #[test]
     // fn test_call_expression_parsing() {
