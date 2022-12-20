@@ -14,7 +14,7 @@ pub enum Expr {
     Infix(Box<Expr>, Token, Box<Expr>),          //left, token, right // TODO: change this to struct
     If(Box<Expr>, BlockStmt, Option<BlockStmt>), // condition blocks blocks
     Function(Vec<Expr>, BlockStmt),              // parameter, blocks
-    Call(Box<Expr>, Vec<Expr>),                  //identifer, parameter
+    Call(Box<Expr>, Vec<Expr>),                  //identifer, parameter x(a, b, c)
 }
 
 #[derive(Debug, PartialEq)]

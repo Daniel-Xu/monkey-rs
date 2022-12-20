@@ -186,9 +186,21 @@ impl Parser {
         while !self.peek_token_is(Token::Semicolon)
             && precedence < Precedence::from_token(&self.peek_token)
         {
-            // we jump to the operator +, and start to parse the infix expression
-            self.next_token();
-            prefix = self.parse_infix(prefix)?;
+            match Precedence::from_token(&self.peek_token) {
+                Precedence::Product
+                | Precedence::Sum
+                | Precedence::LessGreater
+                | Precedence::Equals => {
+                    // we jump to the operator +, and start to parse the infix expression
+                    self.next_token();
+                    prefix = self.parse_infix(prefix)?;
+                }
+                Precedence::Call => {
+                    self.next_token(); // ( is current token
+                    prefix = self.parse_call_expr(prefix)?;
+                }
+                _ => break,
+            }
         }
 
         Ok(prefix)
@@ -343,6 +355,33 @@ impl Parser {
         self.move_to_peek(Token::RParen, ParserError::ExpectedRParen)?;
 
         Ok(args)
+    }
+
+    fn parse_call_expr(&mut self, left: Expr) -> Result<Expr> {
+        // curent token is xx(xx, xx, xx)
+        //                   ^
+        let parameters = self.parse_parameter_exprs()?;
+        Ok(Expr::Call(Box::new(left), parameters))
+    }
+
+    fn parse_parameter_exprs(&mut self) -> Result<Vec<Expr>> {
+        self.next_token();
+        let mut parameters = vec![];
+
+        if !self.cur_token_is(Token::RParen) {
+            let param = self.parse_expr(Lowest)?;
+            parameters.push(param);
+
+            while self.peek_token_is(Token::Comma) {
+                self.next_token();
+                self.next_token();
+                let param = self.parse_expr(Lowest)?;
+                parameters.push(param);
+            }
+
+            self.move_to_peek(Token::RParen, ParserError::ExpectedRParen)?;
+        }
+        Ok(parameters)
     }
 }
 
@@ -821,32 +860,32 @@ mod test_parser_expressions {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_call_expression_parsing() {
-    //     let input = "add(1, 2 * 3, 4 + 5);";
-    //
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_program();
-    //     parser.check_parser_errors();
-    //
-    //     let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Call(
-    //         Box::new(Expr::Identifier("add".to_string())),
-    //         vec![
-    //             Expr::Integer(1),
-    //             Expr::Infix(
-    //                 Box::new(Expr::Integer(2)),
-    //                 Token::Asterisk,
-    //                 Box::new(Expr::Integer(3)),
-    //             ),
-    //             Expr::Infix(
-    //                 Box::new(Expr::Integer(4)),
-    //                 Token::Plus,
-    //                 Box::new(Expr::Integer(5)),
-    //             ),
-    //         ],
-    //     ))];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        parser.check_parser_errors();
+
+        let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Call(
+            Box::new(Expr::Identifier("add".to_string())),
+            vec![
+                Expr::Integer(1),
+                Expr::Infix(
+                    Box::new(Expr::Integer(2)),
+                    Token::Asterisk,
+                    Box::new(Expr::Integer(3)),
+                ),
+                Expr::Infix(
+                    Box::new(Expr::Integer(4)),
+                    Token::Plus,
+                    Box::new(Expr::Integer(5)),
+                ),
+            ],
+        ))];
+
+        assert_eq!(program.statements, expected);
+    }
 }
