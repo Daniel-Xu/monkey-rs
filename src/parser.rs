@@ -78,7 +78,7 @@ impl Parser {
 
     // X X X X
     // i j
-    fn parse_program(&mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut program = Program::new();
 
         while self.cur_token != Token::Eof {
@@ -96,7 +96,7 @@ impl Parser {
     }
 
     pub fn parse_stmt(&mut self) -> Result<Stmt> {
-        match self.cur_token {
+        match &self.cur_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
             _ => self.parse_expr_statement(),
@@ -146,6 +146,7 @@ impl Parser {
             Token::LParen => self.parse_group_expr(),
             Token::If => self.parse_if(),
             Token::Function => self.parse_funcion_literal(),
+            Token::Str(content) => Ok(Expr::Str(content.clone())),
             t => Err(ParserError::ExpectedPrefixToken(t.clone())),
         }
     }
@@ -249,7 +250,7 @@ impl Parser {
         Ok(Stmt::Let(id, expr))
     }
 
-    fn check_parser_errors(&self) {
+    pub fn check_parser_errors(&self) {
         if self.errors.is_empty() {
             return;
         }
@@ -477,22 +478,22 @@ mod test_parser_expressions {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_string() {
-    //     let input = "\"hello world\"; \"hello world 2\"";
-    //
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_program();
-    //     parser.check_parser_errors();
-    //
-    //     let expected: Vec<Stmt> = vec![
-    //         Stmt::Expression(Expr::Str("hello world".to_string())),
-    //         Stmt::Expression(Expr::Str("hello world 2".to_string())),
-    //     ];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_string() {
+        let input = "\"hello world\"; \"hello world 2\"";
+
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+        parser.check_parser_errors();
+
+        let expected: Vec<Stmt> = vec![
+            Stmt::Expression(Expr::Str("hello world".to_string())),
+            Stmt::Expression(Expr::Str("hello world 2".to_string())),
+        ];
+
+        assert_eq!(program.statements, expected);
+    }
 
     #[test]
     fn test_boolean() {

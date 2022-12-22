@@ -10,6 +10,7 @@ pub enum Expr {
     Identifier(String),
     Integer(u32),
     Boolean(bool),
+    Str(String),
     Prefix(Token, Box<Expr>),                    // token, right
     Infix(Box<Expr>, Token, Box<Expr>),          //left, token, right // TODO: change this to struct
     If(Box<Expr>, BlockStmt, Option<BlockStmt>), // condition blocks blocks
