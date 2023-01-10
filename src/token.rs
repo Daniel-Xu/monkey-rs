@@ -11,7 +11,7 @@ pub enum Token {
 
     // id
     Ident(String),
-    Int(u32),
+    Int(i32),
     Str(String),
 
     // delimiters

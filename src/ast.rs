@@ -1,5 +1,5 @@
-// use crate::lexer::Lexer;
-// use crate::parser::Parser;
+use crate::lexer::Lexer;
+use crate::parser::Parser;
 
 use crate::token::Token;
 use std::fmt::{Display, Formatter};
@@ -8,7 +8,7 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, PartialEq)]
 pub enum Expr {
     Identifier(String),
-    Integer(u32),
+    Integer(i32),
     Boolean(bool),
     Str(String),
     Prefix(Token, Box<Expr>),                    // token, right
@@ -55,12 +55,12 @@ impl Program {
         Self { statements: vec![] }
     }
 
-    // fn from_input(input: &str) -> Self {
-    //     // parser parser => program
-    //     let lexer = Lexer::new(input.to_string());
-    //     let mut parser = Parser::new(lexer);
-    //     let program = parser.parse_statements();
-    //
-    //     program
-    // }
+    pub fn from_input(input: &str) -> Self {
+        // parser parser => program
+        let lexer = Lexer::new(input.to_string());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        program
+    }
 }

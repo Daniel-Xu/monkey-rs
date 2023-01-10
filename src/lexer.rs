@@ -71,7 +71,7 @@ impl Lexer {
         self.input[start..self.cur_pos].iter().collect()
     }
 
-    fn read_number(&mut self) -> u32 {
+    fn read_number(&mut self) -> i32 {
         // let abc123 = 123
         let start = self.cur_pos;
         while self.is_digit() {
