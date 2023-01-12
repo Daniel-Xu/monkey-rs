@@ -1,7 +1,8 @@
 use crate::ast::Expr::Integer;
 use crate::ast::{Expr, Program, Stmt};
 use crate::evaluator::EvalError::NotImplemented;
-use crate::object::Object::{self, Null};
+use crate::object::Object::{self};
+use crate::object::{FALSE, NULL, TRUE};
 use crate::token::Token;
 
 // pub fn eval_stmt(statement: Stmt) -> Object {}
@@ -20,7 +21,7 @@ pub enum EvalError {
     NotImplemented,
 }
 pub fn eval(program: Program) -> Result<Object> {
-    let mut result = Null;
+    let mut result = NULL;
     for stmt in &program.statements {
         result = eval_statement(stmt)?;
     }
@@ -46,6 +47,7 @@ fn eval_expression(expr: &Expr) -> Result<Object> {
         Expr::Infix(left, operator, right) => {
             eval_infix_expr(operator, eval_expression(left)?, eval_expression(right)?)
         }
+        Expr::Boolean(bool_value) => Ok(Object::Boolean(*bool_value)), // copy happens here
         _ => Err(NotImplemented),
     }
 }
@@ -53,7 +55,16 @@ fn eval_expression(expr: &Expr) -> Result<Object> {
 fn eval_infix_expr(operator: &Token, left: Object, right: Object) -> Result<Object> {
     match (left, right) {
         (Object::Integer(n1), Object::Integer(n2)) => eval_interger_infix_expr(operator, n1, n2),
+        (Object::Boolean(b1), Object::Boolean(b2)) => eval_boolean_infix_expr(operator, b1, b2),
         (_, _) => Err(NotImplemented),
+    }
+}
+
+fn eval_boolean_infix_expr(operator: &Token, b1: bool, b2: bool) -> Result<Object> {
+    match operator {
+        Token::NotEq => Ok(Object::Boolean(b1 != b2)),
+        Token::Eq => Ok(Object::Boolean(b1 == b2)),
+        _ => Err(NotImplemented),
     }
 }
 
@@ -63,6 +74,10 @@ fn eval_interger_infix_expr(operator: &Token, n1: i32, n2: i32) -> Result<Object
         Token::Plus => Ok(Object::Integer(n1 + n2)),
         Token::Asterisk => Ok(Object::Integer(n1 * n2)),
         Token::Slash => Ok(Object::Integer(n1 / n2)),
+        Token::Lt => Ok(Object::get_bool(n1 < n2)),
+        Token::Gt => Ok(Object::get_bool(n1 > n2)),
+        Token::Eq => Ok(Object::get_bool(n1 == n2)),
+        Token::NotEq => Ok(Object::get_bool(n1 != n2)),
         _ => Err(NotImplemented),
     }
 }
@@ -114,7 +129,6 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             // TODO: restore environment
-            println!("{:?}", program);
             let result = eval(program).unwrap();
             // let env = Environment::new();
             // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
@@ -122,37 +136,41 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn boolean_expression() {
-    //     let tests = vec![
-    //         ("true", TRUE),
-    //         ("false", FALSE),
-    //         ("true;", TRUE),
-    //         ("1 < 2", TRUE),
-    //         ("1 > 2", FALSE),
-    //         ("1 < 1", FALSE),
-    //         ("1 > 1", FALSE),
-    //         ("1 == 1", TRUE),
-    //         ("1 != 1", FALSE),
-    //         ("1 == 2", FALSE),
-    //         ("1 != 2", TRUE),
-    //         ("true == true", TRUE),
-    //         ("false == false", TRUE),
-    //         ("true == false", FALSE),
-    //         ("true != false", TRUE),
-    //         ("false != true", TRUE),
-    //         ("(1 < 2) == true", TRUE),
-    //         ("(1 < 2) == false", FALSE),
-    //         ("(1 > 2) == true", FALSE),
-    //         ("(1 > 2) == false", TRUE),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
+    #[test]
+    fn boolean_expression() {
+        let tests = vec![
+            ("true", TRUE),
+            ("false", FALSE),
+            ("true;", TRUE),
+            ("1 < 2", TRUE),
+            ("1 > 2", FALSE),
+            ("1 < 1", FALSE),
+            ("1 > 1", FALSE),
+            ("1 == 1", TRUE),
+            ("1 != 1", FALSE),
+            ("1 == 2", FALSE),
+            ("1 != 2", TRUE),
+            ("true == true", TRUE),
+            ("false == false", TRUE),
+            ("true == false", FALSE),
+            ("true != false", TRUE),
+            ("false != true", TRUE),
+            ("(1 < 2) == true", TRUE),
+            ("(1 < 2) == false", FALSE),
+            ("(1 > 2) == true", FALSE),
+            ("(1 > 2) == false", TRUE),
+        ];
+
+        for (input, expected) in tests {
+            // let program = Program::new(input);
+            // let env = Environment::new();
+            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+
+            let program = Program::from_input(input);
+            let result = eval(program).unwrap();
+            assert_eq!(result, expected, "{}", input);
+        }
+    }
     //
     // #[test]
     // fn string_expression() {
@@ -305,24 +323,29 @@ mod tests {
     //     }
     // }
     //
-    // #[test]
-    // fn if_expressions() {
-    //     let tests = vec![
-    //         ("if (true) { 10 }", Object::Integer(10)),
-    //         ("if (false) { 10 }", NULL),
-    //         ("if (1) { 10 }", Object::Integer(10)),
-    //         ("if (1 < 2) { 10 }", Object::Integer(10)),
-    //         ("if (1 > 2) { 10 }", NULL),
-    //         ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
-    //         ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
+    #[test]
+    fn if_expressions() {
+        let tests = vec![
+            ("if (true) { 10 }", Object::Integer(10)),
+            ("if (false) { 10 }", NULL),
+            ("if (1) { 10 }", Object::Integer(10)),
+            ("if (1 < 2) { 10 }", Object::Integer(10)),
+            ("if (1 > 2) { 10 }", NULL),
+            ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
+        ];
+
+        for (input, expected) in tests {
+            // let program = Program::new(input);
+            // let env = Environment::new();
+            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+
+            let program = Program::from_input(input);
+            println!("{:?}", program);
+            let result = eval(program).unwrap();
+            assert_eq!(result, expected, "{}", input);
+        }
+    }
     //
     // #[test]
     // fn return_statements() {
