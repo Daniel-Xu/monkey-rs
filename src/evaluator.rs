@@ -1,5 +1,5 @@
 use crate::ast::Expr::Integer;
-use crate::ast::{Expr, Program, Stmt};
+use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::evaluator::EvalError::NotImplemented;
 use crate::object::Object::{self};
 use crate::object::{FALSE, NULL, TRUE};
@@ -29,6 +29,14 @@ pub fn eval(program: Program) -> Result<Object> {
     Ok(result)
 }
 
+fn eval_block_stmts(block: &BlockStmt) -> Result<Object> {
+    let mut result = NULL;
+    for stmt in &block.statements {
+        result = eval_statement(stmt)?;
+    }
+    Ok(result)
+}
+
 pub fn eval_statement(stmt: &Stmt) -> Result<Object> {
     match stmt {
         Stmt::Expression(expr) => eval_expression(expr),
@@ -48,7 +56,36 @@ fn eval_expression(expr: &Expr) -> Result<Object> {
             eval_infix_expr(operator, eval_expression(left)?, eval_expression(right)?)
         }
         Expr::Boolean(bool_value) => Ok(Object::Boolean(*bool_value)), // copy happens here
+
+        Expr::If(condition, if_block, else_block) => {
+            eval_if_expression(condition, if_block, else_block)
+        }
         _ => Err(NotImplemented),
+    }
+}
+
+fn eval_if_expression(
+    condition: &Box<Expr>,
+    if_block: &BlockStmt,
+    else_block: &Option<BlockStmt>,
+) -> Result<Object> {
+    let condition_obj = eval_expression(condition)?;
+    if is_truthy(condition_obj) {
+        eval_block_stmts(if_block)
+    } else {
+        match else_block {
+            None => Ok(NULL),
+            Some(blocks) => eval_block_stmts(blocks),
+        }
+    }
+}
+
+fn is_truthy(condition: Object) -> bool {
+    match condition {
+        NULL => false,
+        TRUE => true,
+        FALSE => false,
+        _ => true,
     }
 }
 
@@ -341,7 +378,6 @@ mod tests {
             // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
 
             let program = Program::from_input(input);
-            println!("{:?}", program);
             let result = eval(program).unwrap();
             assert_eq!(result, expected, "{}", input);
         }
