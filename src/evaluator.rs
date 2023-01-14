@@ -150,6 +150,11 @@ fn eval_prefix_expr(token: &Token, object: Object) -> Result<Object> {
             Object::Integer(num) => Ok(Object::Integer(-num)),
             _ => Err(NotImplemented),
         },
+
+        Token::Bang => match object {
+            Object::Boolean(b) => Ok(Object::Boolean(!b)),
+            _ => Err(NotImplemented),
+        },
         _ => Err(NotImplemented),
     }
 }
@@ -373,22 +378,26 @@ mod tests {
     //     }
     // }
     //
-    // #[test]
-    // fn bang_operator() {
-    //     let tests = vec![
-    //         ("!true", Object::Boolean(false)),
-    //         ("!false", Object::Boolean(true)),
-    //         ("!!true", Object::Boolean(true)),
-    //         ("!!false", Object::Boolean(false)),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
+    #[test]
+    fn bang_operator() {
+        let tests = vec![
+            ("!true", Object::Boolean(false)),
+            ("!false", Object::Boolean(true)),
+            ("!!true", Object::Boolean(true)),
+            ("!!false", Object::Boolean(false)),
+        ];
+
+        for (input, expected) in tests {
+            // let program = Program::new(input);
+            // let env = Environment::new();
+            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+
+            let program = Program::from_input(input);
+            let result = eval(program).unwrap();
+            assert_eq!(result, expected, "{}", input);
+        }
+    }
+
     #[test]
     fn if_expressions() {
         let tests = vec![
@@ -415,14 +424,14 @@ mod tests {
     #[test]
     fn return_statements() {
         let tests = vec![
-            // ("return 11;", Object::Integer(11)),
+            ("return 11;", Object::Integer(11)),
             ("return 12; 9;", Object::Integer(12)),
-            // ("return 3 + (2 * 5); 9;", Object::Integer(13)),
-            // ("9; return 2 * 7; 9;", Object::Integer(14)),
-            // (
-            //     "if (10 > 1) { if (true) { return 15; } return 1; } ",
-            //     Object::Integer(15),
-            // ),
+            ("return 3 + (2 * 5); 9;", Object::Integer(13)),
+            ("9; return 2 * 7; 9;", Object::Integer(14)),
+            (
+                "if (10 > 1) { if (true) { return 15; } return 1; } ",
+                Object::Integer(15),
+            ),
         ];
 
         for (input, expected) in tests {
