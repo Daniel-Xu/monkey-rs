@@ -72,6 +72,8 @@ fn eval_expression(expr: &Expr) -> Result<Object> {
         Expr::If(condition, if_block, else_block) => {
             eval_if_expression(condition, if_block, else_block)
         }
+
+        Expr::Str(expr) => Ok(Object::Str(expr.clone())),
         _ => Err(NotImplemented),
     }
 }
@@ -105,7 +107,18 @@ fn eval_infix_expr(operator: &Token, left: Object, right: Object) -> Result<Obje
     match (left, right) {
         (Object::Integer(n1), Object::Integer(n2)) => eval_interger_infix_expr(operator, n1, n2),
         (Object::Boolean(b1), Object::Boolean(b2)) => eval_boolean_infix_expr(operator, b1, b2),
+        (Object::Str(s1), Object::Str(s2)) => eval_string_infix_expr(operator, s1, s2),
         (_, _) => Err(NotImplemented),
+    }
+}
+
+// do we need to use &str instead of String?
+fn eval_string_infix_expr(operator: &Token, s1: String, s2: String) -> Result<Object> {
+    match operator {
+        Token::Plus => Ok(Object::Str(s1 + &s2)),
+        Token::Eq => Ok(Object::Boolean(s1 == s2)),
+        Token::NotEq => Ok(Object::Boolean(s1 != s2)),
+        _ => Err(NotImplemented),
     }
 }
 
@@ -216,56 +229,60 @@ mod tests {
             assert_eq!(result, expected, "{}", input);
         }
     }
-    //
-    // #[test]
-    // fn string_expression() {
-    //     let tests = vec![
-    //         ("\"hello\"", "hello"),
-    //         ("\":)\"", ":)"),
-    //         ("\"true\"", "true"),
-    //         ("\"123\"", "123"),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(
-    //             eval(program, env).unwrap(),
-    //             Object::Str(expected.to_string()),
-    //             "{}",
-    //             input
-    //         );
-    //     }
-    // }
-    //
-    // #[test]
-    // fn string_infix_expression() {
-    //     let tests = vec![
-    //         (
-    //             "\"hello, \" + \"world!\"",
-    //             Object::Str("hello, world!".to_string()),
-    //         ),
-    //         (
-    //             "\"hello\" + \" \" + \":)\"",
-    //             Object::Str("hello :)".to_string()),
-    //         ),
-    //         ("\"hello\" == \"hello\"", TRUE),
-    //         ("\"hello\" == \":)\"", FALSE),
-    //         ("\"hello\" != \":)\"", TRUE),
-    //         ("\"hello\" != \"hello\"", FALSE),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         // let program = Program::new(input);
-    //         // let env = Environment::new();
-    //         // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //
-    //         let program = Program::from_input(input);
-    //         let result = eval(program).unwrap();
-    //         assert_eq!(result, expected, "{}", input);
-    //     }
-    // }
-    //
+
+    #[test]
+    fn string_expression() {
+        let tests = vec![
+            ("\"hello\"", "hello"),
+            ("\":)\"", ":)"),
+            ("\"true\"", "true"),
+            ("\"123\"", "123"),
+        ];
+
+        for (input, expected) in tests {
+            // let program = Program::new(input);
+            // let env = Environment::new();
+            // assert_eq!(
+            //     eval(program, env).unwrap(),
+            //     Object::Str(expected.to_string()),
+            //     "{}",
+            //     input
+            // );
+
+            let program = Program::from_input(input);
+            let result = eval(program).unwrap();
+            assert_eq!(result, Object::Str(expected.to_string()), "{}", input);
+        }
+    }
+
+    #[test]
+    fn string_infix_expression() {
+        let tests = vec![
+            (
+                "\"hello, \" + \"world!\"",
+                Object::Str("hello, world!".to_string()),
+            ),
+            (
+                "\"hello\" + \" \" + \":)\"",
+                Object::Str("hello :)".to_string()),
+            ),
+            ("\"hello\" == \"hello\"", TRUE),
+            ("\"hello\" == \":)\"", FALSE),
+            ("\"hello\" != \":)\"", TRUE),
+            ("\"hello\" != \"hello\"", FALSE),
+        ];
+
+        for (input, expected) in tests {
+            // let program = Program::new(input);
+            // let env = Environment::new();
+            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+
+            let program = Program::from_input(input);
+            let result = eval(program).unwrap();
+            assert_eq!(result, expected, "{}", input);
+        }
+    }
+
     // #[test]
     // fn array_literals() {
     //     let tests = vec![
@@ -461,9 +478,14 @@ mod tests {
     //     ];
     //
     //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap_err(), expected, "{}", input);
+    //         // let program = Program::new(input);
+    //         // let env = Environment::new();
+    //         // assert_eq!(eval(program, env).unwrap_err(), expected, "{}", input);
+    //
+    //
+    //         let program = Program::from_input(input);
+    //         let result = eval(program).unwrap();
+    //         assert_eq!(result, expected, "{}", input);
     //     }
     // }
     //
