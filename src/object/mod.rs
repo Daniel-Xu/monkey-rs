@@ -2,6 +2,7 @@
 pub enum Object {
     Integer(i32),
     Boolean(bool),
+    ReturnValue(Box<Object>),
     Null,
 }
 

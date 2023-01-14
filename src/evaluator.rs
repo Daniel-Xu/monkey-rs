@@ -24,6 +24,11 @@ pub fn eval(program: Program) -> Result<Object> {
     let mut result = NULL;
     for stmt in &program.statements {
         result = eval_statement(stmt)?;
+
+        if let Object::ReturnValue(value) = result {
+            result = *value;
+            break;
+        }
     }
 
     Ok(result)
@@ -33,6 +38,13 @@ fn eval_block_stmts(block: &BlockStmt) -> Result<Object> {
     let mut result = NULL;
     for stmt in &block.statements {
         result = eval_statement(stmt)?;
+
+        /**
+         * we should still return ReturnValue so it can be handle correctly in eval()
+         */
+        if matches!(result, Object::ReturnValue(_)) {
+            break;
+        }
     }
     Ok(result)
 }
@@ -40,9 +52,9 @@ fn eval_block_stmts(block: &BlockStmt) -> Result<Object> {
 pub fn eval_statement(stmt: &Stmt) -> Result<Object> {
     match stmt {
         Stmt::Expression(expr) => eval_expression(expr),
+        Stmt::Return(expr) => Ok(Object::ReturnValue(Box::new(eval_expression(expr)?))),
         _ => Err(NotImplemented),
         // Let() => eval_let_stmt(),
-        // Return() => eval_return_stmt(),
     }
 }
 
@@ -127,10 +139,6 @@ fn eval_prefix_expr(token: &Token, object: Object) -> Result<Object> {
         },
         _ => Err(NotImplemented),
     }
-}
-
-fn eval_return_stmt() {
-    todo!()
 }
 
 fn eval_let_stmt() {
@@ -248,9 +256,13 @@ mod tests {
     //     ];
     //
     //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+    //         // let program = Program::new(input);
+    //         // let env = Environment::new();
+    //         // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+    //
+    //         let program = Program::from_input(input);
+    //         let result = eval(program).unwrap();
+    //         assert_eq!(result, expected, "{}", input);
     //     }
     // }
     //
@@ -382,27 +394,31 @@ mod tests {
             assert_eq!(result, expected, "{}", input);
         }
     }
-    //
-    // #[test]
-    // fn return_statements() {
-    //     let tests = vec![
-    //         ("return 11;", Object::Integer(11)),
-    //         ("return 12; 9;", Object::Integer(12)),
-    //         ("return 3 + (2 * 5); 9;", Object::Integer(13)),
-    //         ("9; return 2 * 7; 9;", Object::Integer(14)),
-    //         (
-    //             "if (10 > 1) { if (true) { return 15; } return 1; } ",
-    //             Object::Integer(15),
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
+
+    #[test]
+    fn return_statements() {
+        let tests = vec![
+            // ("return 11;", Object::Integer(11)),
+            ("return 12; 9;", Object::Integer(12)),
+            // ("return 3 + (2 * 5); 9;", Object::Integer(13)),
+            // ("9; return 2 * 7; 9;", Object::Integer(14)),
+            // (
+            //     "if (10 > 1) { if (true) { return 15; } return 1; } ",
+            //     Object::Integer(15),
+            // ),
+        ];
+
+        for (input, expected) in tests {
+            // let program = Program::new(input);
+            // let env = Environment::new();
+            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+
+            let program = Program::from_input(input);
+            let result = eval(program).unwrap();
+            assert_eq!(result, expected, "{}", input);
+        }
+    }
+
     // #[test]
     // fn error_handling() {
     //     let tests = vec![
