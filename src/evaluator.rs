@@ -108,7 +108,10 @@ fn eval_infix_expr(operator: &Token, left: Object, right: Object) -> Result<Obje
         (Object::Integer(n1), Object::Integer(n2)) => eval_interger_infix_expr(operator, n1, n2),
         (Object::Boolean(b1), Object::Boolean(b2)) => eval_boolean_infix_expr(operator, b1, b2),
         (Object::Str(s1), Object::Str(s2)) => eval_string_infix_expr(operator, s1, s2),
-        (_, _) => Err(NotImplemented),
+        (left, right) => Err(EvalError::TypeMismatch(
+            format!("{} {} {}", left.debug_type(), operator, right.debug_type()),
+            "eval_infix_expr".to_string(),
+        )),
     }
 }
 
@@ -126,7 +129,10 @@ fn eval_boolean_infix_expr(operator: &Token, b1: bool, b2: bool) -> Result<Objec
     match operator {
         Token::NotEq => Ok(Object::Boolean(b1 != b2)),
         Token::Eq => Ok(Object::Boolean(b1 == b2)),
-        _ => Err(NotImplemented),
+        _ => Err(EvalError::UnknownOperator(
+            format!("{}", operator),
+            "eval_boolean_infix_expr".to_string(),
+        )),
     }
 }
 
@@ -148,14 +154,21 @@ fn eval_prefix_expr(token: &Token, object: Object) -> Result<Object> {
     match token {
         Token::Minus => match object {
             Object::Integer(num) => Ok(Object::Integer(-num)),
-            _ => Err(NotImplemented),
+            _ => Err(EvalError::UnknownOperator(
+                format!("{}{}", token, object.debug_type()),
+                "eval_prefix_expr".to_string(),
+            )),
         },
 
         Token::Bang => match object {
             Object::Boolean(b) => Ok(Object::Boolean(!b)),
             _ => Err(NotImplemented),
         },
-        _ => Err(NotImplemented),
+
+        _ => Err(EvalError::UnknownOperator(
+            format!("{}{}", token, object.debug_type()),
+            "eval_prefix_expr".to_string(),
+        )),
     }
 }
 
@@ -445,58 +458,58 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn error_handling() {
-    //     let tests = vec![
-    //         (
-    //             "5 + true;",
-    //             EvalError::TypeMismatch("Integer + Boolean".to_string(), "eval_infix_expression".to_string())
-    //         ),
-    //         (
-    //             "5 + true; 5;",
-    //             EvalError::TypeMismatch("Integer + Boolean".to_string(), "eval_infix_expression".to_string())
-    //         ),
-    //         ("-true", EvalError::UnknownOperator("-Boolean".to_string(), "eval_prefix_expression".to_string())),
-    //         (
-    //             "true + false",
-    //             EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expression".to_string())
-    //         ),
-    //         (
-    //             "5; true + false; 5",
-    //             EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expression".to_string())
-    //         ),
-    //         (
-    //             "if (2 > 1) { true + false; } else { 5 };",
-    //             EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expression".to_string())
-    //         ),
-    //         (
-    //             "if (2 > 1) { if (2 < 1) { return 1; } else { return true + true; } } else { return 2; };",
-    //             EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expression".to_string())
-    //         ),
-    //         (
-    //             "let add = fn(a, b) { a + b }; add(1, 2, 3);",
-    //             EvalError::WrongNumberOfArguments("parameters 2, arguments 3".to_string(), "extend_function_environment".to_string())
-    //         ),
-    //         (
-    //             "\"Hello\" - \"Hello\"",
-    //             EvalError::UnknownOperator("-".to_string(), "eval_string_infix_expression".to_string())
-    //         ),
-    //         ("[1,2,3][3]", EvalError::IndexOutOfBounds("array length = 3, index = 3".to_string(), "eval_index_expression".to_string())),
-    //         ("[1,2,3][-1]", EvalError::IndexOutOfBounds("negative indices not supported. index = -1".to_string(), "eval_index_expression".to_string())),
-    //         ("{true: 2}[[1,2,3]]", EvalError::TypeMismatch("Array is not hashable".to_string(), "eval_index_expression".to_string())),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         // let program = Program::new(input);
-    //         // let env = Environment::new();
-    //         // assert_eq!(eval(program, env).unwrap_err(), expected, "{}", input);
-    //
-    //
-    //         let program = Program::from_input(input);
-    //         let result = eval(program).unwrap();
-    //         assert_eq!(result, expected, "{}", input);
-    //     }
-    // }
+    #[test]
+    fn error_handling() {
+        let tests = vec![
+            (
+                "5 + true;",
+                EvalError::TypeMismatch("Integer + Boolean".to_string(), "eval_infix_expr".to_string())
+            ),
+            (
+                "5 + true; 5;",
+                EvalError::TypeMismatch("Integer + Boolean".to_string(), "eval_infix_expr".to_string())
+            ),
+            ("-true", EvalError::UnknownOperator("-Boolean".to_string(), "eval_prefix_expr".to_string())),
+            (
+                "true + false",
+                EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expr".to_string())
+            ),
+            (
+                "5; true + false; 5",
+                EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expr".to_string())
+            ),
+            (
+                "if (2 > 1) { true + false; } else { 5 };",
+                EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expr".to_string())
+            ),
+            (
+                "if (2 > 1) { if (2 < 1) { return 1; } else { return true + true; } } else { return 2; };",
+                EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expr".to_string())
+            ),
+            // (
+            //     "let add = fn(a, b) { a + b }; add(1, 2, 3);",
+            //     EvalError::WrongNumberOfArguments("parameters 2, arguments 3".to_string(), "extend_function_environment".to_string())
+            // ),
+            // (
+            //     "\"Hello\" - \"Hello\"",
+            //     EvalError::UnknownOperator("-".to_string(), "eval_string_infix_expression".to_string())
+            // ),
+            // ("[1,2,3][3]", EvalError::IndexOutOfBounds("array length = 3, index = 3".to_string(), "eval_index_expression".to_string())),
+            // ("[1,2,3][-1]", EvalError::IndexOutOfBounds("negative indices not supported. index = -1".to_string(), "eval_index_expression".to_string())),
+            // ("{true: 2}[[1,2,3]]", EvalError::TypeMismatch("Array is not hashable".to_string(), "eval_index_expression".to_string())),
+        ];
+
+        for (input, expected) in tests {
+            // let program = Program::new(input);
+            // let env = Environment::new();
+            // assert_eq!(eval(program, env).unwrap_err(), expected, "{}", input);
+
+            let program = Program::from_input(input);
+            let result = eval(program).unwrap_err();
+            println!("{:?}", result);
+            assert_eq!(result, expected, "{}", input);
+        }
+    }
     //
     // #[test]
     // fn let_statements() {
