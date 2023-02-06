@@ -1,6 +1,7 @@
 use crate::ast::Expr::Integer;
 use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::evaluator::EvalError::NotImplemented;
+use crate::object::environment::{Environment, SharedEnv};
 use crate::object::Object::{self};
 use crate::object::{FALSE, NULL, TRUE};
 use crate::token::Token;
@@ -20,10 +21,10 @@ pub enum EvalError {
     IndexOutOfBounds(String, String),
     NotImplemented,
 }
-pub fn eval(program: Program) -> Result<Object> {
+pub fn eval(program: Program, env: SharedEnv) -> Result<Object> {
     let mut result = NULL;
     for stmt in &program.statements {
-        result = eval_statement(stmt)?;
+        result = eval_statement(stmt, env.clone())?;
 
         if let Object::ReturnValue(value) = result {
             result = *value;
@@ -34,10 +35,13 @@ pub fn eval(program: Program) -> Result<Object> {
     Ok(result)
 }
 
-fn eval_block_stmts(block: &BlockStmt) -> Result<Object> {
+// for stmt in stmts:
+//      eval(stmt, env)
+//      env here needs to be Copy or be shared
+fn eval_block_stmts(block: &BlockStmt, env: SharedEnv) -> Result<Object> {
     let mut result = NULL;
     for stmt in &block.statements {
-        result = eval_statement(stmt)?;
+        result = eval_statement(stmt, env.clone())?;
 
         /**
          * we should still return ReturnValue so it can be handle correctly in eval()
@@ -49,28 +53,42 @@ fn eval_block_stmts(block: &BlockStmt) -> Result<Object> {
     Ok(result)
 }
 
-pub fn eval_statement(stmt: &Stmt) -> Result<Object> {
+// why env needs interior multability?
+// env needs to be shared by different eval_xxx
+// in each of them, env might perform store operation which needs exclusive ownership or interior mutability
+pub fn eval_statement(stmt: &Stmt, env: SharedEnv) -> Result<Object> {
     match stmt {
-        Stmt::Expression(expr) => eval_expression(expr),
-        Stmt::Return(expr) => Ok(Object::ReturnValue(Box::new(eval_expression(expr)?))),
+        Stmt::Expression(expr) => eval_expression(expr, env.clone()),
+        Stmt::Return(expr) => Ok(Object::ReturnValue(Box::new(eval_expression(
+            expr,
+            env.clone(),
+        )?))),
+        Stmt::Let(identifier, expr) => {
+            let v = eval_expression(expr, env.clone())?;
+            env.borrow_mut().set(identifier.to_string(), v);
+            Ok(NULL)
+        }
+
         _ => Err(NotImplemented),
         // Let() => eval_let_stmt(),
     }
 }
 
-fn eval_expression(expr: &Expr) -> Result<Object> {
+fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
     match expr {
         Expr::Integer(n) => Ok(Object::Integer(*n)),
-        Expr::Prefix(token, inner) => eval_prefix_expr(token, eval_expression(inner)?),
+        Expr::Prefix(token, inner) => eval_prefix_expr(token, eval_expression(inner, env.clone())?),
 
         // Infix(Box<Expr>, Token, Box<Expr>),          //left, token, right // TODO: change this to struct
-        Expr::Infix(left, operator, right) => {
-            eval_infix_expr(operator, eval_expression(left)?, eval_expression(right)?)
-        }
+        Expr::Infix(left, operator, right) => eval_infix_expr(
+            operator,
+            eval_expression(left, env.clone())?,
+            eval_expression(right, env.clone())?,
+        ),
         Expr::Boolean(bool_value) => Ok(Object::Boolean(*bool_value)), // copy happens here
 
         Expr::If(condition, if_block, else_block) => {
-            eval_if_expression(condition, if_block, else_block)
+            eval_if_expression(condition, if_block, else_block, env)
         }
 
         Expr::Str(expr) => Ok(Object::Str(expr.clone())),
@@ -82,14 +100,15 @@ fn eval_if_expression(
     condition: &Box<Expr>,
     if_block: &BlockStmt,
     else_block: &Option<BlockStmt>,
+    env: SharedEnv,
 ) -> Result<Object> {
-    let condition_obj = eval_expression(condition)?;
+    let condition_obj = eval_expression(condition, env.clone())?;
     if is_truthy(condition_obj) {
-        eval_block_stmts(if_block)
+        eval_block_stmts(if_block, env.clone())
     } else {
         match else_block {
             None => Ok(NULL),
-            Some(blocks) => eval_block_stmts(blocks),
+            Some(blocks) => eval_block_stmts(blocks, env.clone()),
         }
     }
 }
@@ -121,7 +140,10 @@ fn eval_string_infix_expr(operator: &Token, s1: String, s2: String) -> Result<Ob
         Token::Plus => Ok(Object::Str(s1 + &s2)),
         Token::Eq => Ok(Object::Boolean(s1 == s2)),
         Token::NotEq => Ok(Object::Boolean(s1 != s2)),
-        _ => Err(NotImplemented),
+        _ => Err(EvalError::UnknownOperator(
+            format!("{}", operator),
+            "eval_string_infix_expr".to_string(),
+        )),
     }
 }
 
@@ -205,10 +227,9 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             // TODO: restore environment
-            let result = eval(program).unwrap();
-            // let env = Environment::new();
-            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-            assert_eq!(result, expected, "{}", input);
+            let env = Environment::new();
+            // let result = eval(program, env).unwrap();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -238,13 +259,9 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            // let program = Program::new(input);
-            // let env = Environment::new();
-            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-
             let program = Program::from_input(input);
-            let result = eval(program).unwrap();
-            assert_eq!(result, expected, "{}", input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -258,18 +275,14 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            // let program = Program::new(input);
-            // let env = Environment::new();
-            // assert_eq!(
-            //     eval(program, env).unwrap(),
-            //     Object::Str(expected.to_string()),
-            //     "{}",
-            //     input
-            // );
-
             let program = Program::from_input(input);
-            let result = eval(program).unwrap();
-            assert_eq!(result, Object::Str(expected.to_string()), "{}", input);
+            let env = Environment::new();
+            assert_eq!(
+                eval(program, env).unwrap(),
+                Object::Str(expected.to_string()),
+                "{}",
+                input
+            );
         }
     }
 
@@ -291,13 +304,9 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            // let program = Program::new(input);
-            // let env = Environment::new();
-            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-
             let program = Program::from_input(input);
-            let result = eval(program).unwrap();
-            assert_eq!(result, expected, "{}", input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -401,13 +410,9 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            // let program = Program::new(input);
-            // let env = Environment::new();
-            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-
             let program = Program::from_input(input);
-            let result = eval(program).unwrap();
-            assert_eq!(result, expected, "{}", input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -424,13 +429,9 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            // let program = Program::new(input);
-            // let env = Environment::new();
-            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-
             let program = Program::from_input(input);
-            let result = eval(program).unwrap();
-            assert_eq!(result, expected, "{}", input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -448,13 +449,9 @@ mod tests {
         ];
 
         for (input, expected) in tests {
-            // let program = Program::new(input);
-            // let env = Environment::new();
-            // assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-
             let program = Program::from_input(input);
-            let result = eval(program).unwrap();
-            assert_eq!(result, expected, "{}", input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -490,50 +487,45 @@ mod tests {
             //     "let add = fn(a, b) { a + b }; add(1, 2, 3);",
             //     EvalError::WrongNumberOfArguments("parameters 2, arguments 3".to_string(), "extend_function_environment".to_string())
             // ),
-            // (
-            //     "\"Hello\" - \"Hello\"",
-            //     EvalError::UnknownOperator("-".to_string(), "eval_string_infix_expression".to_string())
-            // ),
+            (
+                "\"Hello\" - \"Hello\"",
+                EvalError::UnknownOperator("-".to_string(), "eval_string_infix_expr".to_string())
+            ),
             // ("[1,2,3][3]", EvalError::IndexOutOfBounds("array length = 3, index = 3".to_string(), "eval_index_expression".to_string())),
             // ("[1,2,3][-1]", EvalError::IndexOutOfBounds("negative indices not supported. index = -1".to_string(), "eval_index_expression".to_string())),
             // ("{true: 2}[[1,2,3]]", EvalError::TypeMismatch("Array is not hashable".to_string(), "eval_index_expression".to_string())),
         ];
 
         for (input, expected) in tests {
-            // let program = Program::new(input);
-            // let env = Environment::new();
-            // assert_eq!(eval(program, env).unwrap_err(), expected, "{}", input);
-
             let program = Program::from_input(input);
-            let result = eval(program).unwrap_err();
-            println!("{:?}", result);
-            assert_eq!(result, expected, "{}", input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap_err(), expected, "{}", input);
         }
     }
-    //
-    // #[test]
-    // fn let_statements() {
-    //     let tests = vec![
-    //         ("let a = 5; a;", Object::Integer(5)),
-    //         ("let a = 5 * 5; a;", Object::Integer(25)),
-    //         ("let a = 5; let b = a; b;", Object::Integer(5)),
-    //         (
-    //             "let a = 5; let b = a; let c = a + b + 5; c;",
-    //             Object::Integer(15),
-    //         ),
-    //         (
-    //             "let a = 5; let b = a; let c = a + b + 5; c * 3;",
-    //             Object::Integer(45),
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
+
+    #[test]
+    fn let_statements() {
+        let tests = vec![
+            ("let a = 5; a;", Object::Integer(5)),
+            ("let a = 5 * 5; a;", Object::Integer(25)),
+            ("let a = 5; let b = a; b;", Object::Integer(5)),
+            (
+                "let a = 5; let b = a; let c = a + b + 5; c;",
+                Object::Integer(15),
+            ),
+            (
+                "let a = 5; let b = a; let c = a + b + 5; c * 3;",
+                Object::Integer(45),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
+
     // #[test]
     // fn functions_objects_0() {
     //     let tests = vec![(
