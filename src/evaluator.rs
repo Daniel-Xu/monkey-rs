@@ -5,6 +5,7 @@ use crate::object::environment::{Environment, SharedEnv};
 use crate::object::Object::{self};
 use crate::object::{FALSE, NULL, TRUE};
 use crate::token::Token;
+use std::borrow::BorrowMut;
 
 // pub fn eval_stmt(statement: Stmt) -> Object {}
 
@@ -21,10 +22,10 @@ pub enum EvalError {
     IndexOutOfBounds(String, String),
     NotImplemented,
 }
-pub fn eval(program: Program, env: SharedEnv) -> Result<Object> {
+pub fn eval(program: Program, env: &SharedEnv) -> Result<Object> {
     let mut result = NULL;
     for stmt in &program.statements {
-        result = eval_statement(stmt, env.clone())?;
+        result = eval_statement(stmt, env)?;
 
         if let Object::ReturnValue(value) = result {
             result = *value;
@@ -38,10 +39,10 @@ pub fn eval(program: Program, env: SharedEnv) -> Result<Object> {
 // for stmt in stmts:
 //      eval(stmt, env)
 //      env here needs to be Copy or be shared
-fn eval_block_stmts(block: &BlockStmt, env: SharedEnv) -> Result<Object> {
+fn eval_block_stmts(block: &BlockStmt, env: &SharedEnv) -> Result<Object> {
     let mut result = NULL;
     for stmt in &block.statements {
-        result = eval_statement(stmt, env.clone())?;
+        result = eval_statement(stmt, env)?;
 
         /**
          * we should still return ReturnValue so it can be handle correctly in eval()
@@ -56,34 +57,34 @@ fn eval_block_stmts(block: &BlockStmt, env: SharedEnv) -> Result<Object> {
 // why env needs interior multability?
 // env needs to be shared by different eval_xxx
 // in each of them, env might perform store operation which needs exclusive ownership or interior mutability
-pub fn eval_statement(stmt: &Stmt, env: SharedEnv) -> Result<Object> {
+pub fn eval_statement(stmt: &Stmt, env: &SharedEnv) -> Result<Object> {
     match stmt {
-        Stmt::Expression(expr) => eval_expression(expr, env.clone()),
-        Stmt::Return(expr) => Ok(Object::ReturnValue(Box::new(eval_expression(
-            expr,
-            env.clone(),
-        )?))),
+        Stmt::Expression(expr) => eval_expression(expr, env),
+        Stmt::Return(expr) => Ok(Object::ReturnValue(Box::new(eval_expression(expr, env)?))),
         Stmt::Let(identifier, expr) => {
-            let v = eval_expression(expr, env.clone())?;
+            let v = eval_expression(expr, env)?;
             env.borrow_mut().set(identifier.to_string(), v);
             Ok(NULL)
         }
 
         _ => Err(NotImplemented),
-        // Let() => eval_let_stmt(),
     }
 }
 
-fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
+fn eval_expression(expr: &Expr, env: &SharedEnv) -> Result<Object> {
     match expr {
+        Expr::Identifier(id) => match env.borrow().get(id.to_string()) {
+            None => Err(NotImplemented),
+            Some(obj) => Ok(obj),
+        },
         Expr::Integer(n) => Ok(Object::Integer(*n)),
-        Expr::Prefix(token, inner) => eval_prefix_expr(token, eval_expression(inner, env.clone())?),
+        Expr::Prefix(token, inner) => eval_prefix_expr(token, eval_expression(inner, env)?),
 
         // Infix(Box<Expr>, Token, Box<Expr>),          //left, token, right // TODO: change this to struct
         Expr::Infix(left, operator, right) => eval_infix_expr(
             operator,
-            eval_expression(left, env.clone())?,
-            eval_expression(right, env.clone())?,
+            eval_expression(left, env)?,
+            eval_expression(right, env)?,
         ),
         Expr::Boolean(bool_value) => Ok(Object::Boolean(*bool_value)), // copy happens here
 
@@ -100,15 +101,15 @@ fn eval_if_expression(
     condition: &Box<Expr>,
     if_block: &BlockStmt,
     else_block: &Option<BlockStmt>,
-    env: SharedEnv,
+    env: &SharedEnv,
 ) -> Result<Object> {
-    let condition_obj = eval_expression(condition, env.clone())?;
+    let condition_obj = eval_expression(condition, env)?;
     if is_truthy(condition_obj) {
-        eval_block_stmts(if_block, env.clone())
+        eval_block_stmts(if_block, env)
     } else {
         match else_block {
             None => Ok(NULL),
-            Some(blocks) => eval_block_stmts(blocks, env.clone()),
+            Some(blocks) => eval_block_stmts(blocks, env),
         }
     }
 }
@@ -194,10 +195,6 @@ fn eval_prefix_expr(token: &Token, object: Object) -> Result<Object> {
     }
 }
 
-fn eval_let_stmt() {
-    todo!()
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -229,7 +226,7 @@ mod tests {
             // TODO: restore environment
             let env = Environment::new();
             // let result = eval(program, env).unwrap();
-            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -261,7 +258,7 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -278,7 +275,7 @@ mod tests {
             let program = Program::from_input(input);
             let env = Environment::new();
             assert_eq!(
-                eval(program, env).unwrap(),
+                eval(program, &env).unwrap(),
                 Object::Str(expected.to_string()),
                 "{}",
                 input
@@ -306,7 +303,7 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -412,7 +409,7 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -431,7 +428,7 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -451,7 +448,7 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap(), expected, "{}", input);
         }
     }
 
@@ -499,7 +496,7 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            assert_eq!(eval(program, env).unwrap_err(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap_err(), expected, "{}", input);
         }
     }
 
@@ -522,7 +519,7 @@ mod tests {
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+            assert_eq!(eval(program, &env).unwrap(), expected, "{}", input);
         }
     }
 

@@ -9,13 +9,17 @@ pub struct Environment {
     store: HashMap<String, Object>,
 }
 
-pub type SharedEnv = Rc<RefCell<Environment>>;
+// pub type SharedEnv = Rc<RefCell<Environment>>;
+pub type SharedEnv = RefCell<Environment>;
 
 impl Environment {
     pub fn new() -> SharedEnv {
-        Rc::new(RefCell::new(Self {
+        // Rc::new(RefCell::new(Self {
+        //     store: HashMap::new(),
+        // }))
+        RefCell::new(Self {
             store: HashMap::new(),
-        }))
+        })
     }
 
     pub fn set(&mut self, k: String, v: Object) {
