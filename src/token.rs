@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter, Write};
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Eq, Clone)]
 pub enum Token {
     // keyword
     Let,

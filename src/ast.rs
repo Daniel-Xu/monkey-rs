@@ -5,7 +5,7 @@ use crate::token::Token;
 use std::fmt::{Display, Formatter};
 
 // this is the expr
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr {
     Identifier(String),
     Integer(i32),
@@ -18,11 +18,42 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Expr>),                  //identifer, parameter x(a, b, c)
 }
 
-#[derive(Debug, PartialEq)]
+impl Display for Expr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Identifier(s) => write!(f, "{}", s),
+            Expr::Integer(v) => write!(f, "{}", v),
+            Expr::Boolean(b) => write!(f, "{}", b),
+            Expr::Str(s) => write!(f, "{}", s),
+            Expr::Prefix(token, expr) => write!(f, "({}{})", token.to_string(), expr.to_string()),
+            Expr::Infix(left, op, right) => write!(f, "({} {} {})", left, op, right),
+            Expr::If(condition, if_block, else_block) => match else_block {
+                Some(v) => write!(f, "if {} {} else {}", condition, if_block, v),
+                None => write!(f, "if {} {}", condition, if_block),
+            },
+            Expr::Function(parameter, block) => {
+                write!(f, "fn({}) {}", pretty_print(parameter), block)
+            }
+            Expr::Call(name, parameter) => write!(f, "{}({})", name, pretty_print(parameter)),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Stmt {
     Let(String, Expr),
     Return(Expr),
     Expression(Expr), // this is expression stmt
+}
+
+impl Display for Stmt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Stmt::Let(id, expr) => write!(f, "let {} = {};", id, expr),
+            Stmt::Return(expr) => write!(f, "return {};", expr),
+            Stmt::Expression(expr) => write!(f, "{}", expr),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -30,7 +61,7 @@ pub struct Program {
     pub statements: Vec<Stmt>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BlockStmt {
     pub statements: Vec<Stmt>,
 }
@@ -41,6 +72,13 @@ impl BlockStmt {
     }
     pub fn is_empty(&self) -> bool {
         self.statements.is_empty()
+    }
+}
+
+impl Display for BlockStmt {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let s: String = self.statements.iter().map(|s| s.to_string()).collect();
+        f.write_str(&s)
     }
 }
 
@@ -63,4 +101,12 @@ impl Program {
 
         program
     }
+}
+
+pub fn pretty_print<T: Display>(content: &[T]) -> String {
+    content
+        .iter()
+        .map(|e| e.to_string())
+        .collect::<Vec<String>>()
+        .join(", ")
 }

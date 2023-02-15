@@ -1,3 +1,5 @@
+use crate::ast::{pretty_print, BlockStmt, Expr};
+use crate::object::environment::{Environment, SharedEnv};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -6,6 +8,7 @@ pub enum Object {
     Boolean(bool),
     ReturnValue(Box<Object>),
     Str(String),
+    Function(Vec<Expr>, BlockStmt, SharedEnv), // this is definition, not invocation
     Null,
 }
 
@@ -23,6 +26,9 @@ impl Display for Object {
             Object::Str(s) => write!(f, "{}", s),
             Object::Null => write!(f, "null"),
             Object::ReturnValue(object) => write!(f, "return {}", object),
+            Object::Function(params, body, env) => {
+                write!(f, "fn({}) {}", pretty_print(params), body)
+            }
         }
     }
 }
@@ -42,6 +48,7 @@ impl Object {
             Object::Str(_) => "String",
             Object::Null => "Null",
             Object::ReturnValue(_) => "Return",
+            Object::Function(_, _, _) => "Function",
         }
         .to_string()
     }
