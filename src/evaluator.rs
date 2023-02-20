@@ -99,7 +99,7 @@ fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
     }
 }
 
-fn eval_call_expr(name: &Box<Expr>, params: &Vec<Expr>, env: SharedEnv) -> Result<Object> {
+fn eval_call_expr(name: &Expr, params: &[Expr], env: SharedEnv) -> Result<Object> {
     // function_object is getting from env with identifier
     let function_object = eval_expression(name, Rc::clone(&env))?;
     let v = eval_expressions(params, Rc::clone(&env))?;
@@ -151,7 +151,7 @@ fn extend_function_environment(
     Ok(extended_env)
 }
 
-fn eval_expressions(exprs: &Vec<Expr>, env: SharedEnv) -> Result<Vec<Object>> {
+fn eval_expressions(exprs: &[Expr], env: SharedEnv) -> Result<Vec<Object>> {
     let mut res = Vec::new();
     for expr in exprs {
         res.push(eval_expression(expr, Rc::clone(&env))?)
@@ -160,7 +160,7 @@ fn eval_expressions(exprs: &Vec<Expr>, env: SharedEnv) -> Result<Vec<Object>> {
 }
 
 fn eval_if_expression(
-    condition: &Box<Expr>,
+    condition: &Expr,
     if_block: &BlockStmt,
     else_block: &Option<BlockStmt>,
     env: SharedEnv,
