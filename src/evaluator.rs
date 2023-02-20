@@ -5,6 +5,7 @@ use crate::object::environment::{Environment, SharedEnv};
 use crate::object::Object::{self};
 use crate::object::{FALSE, NULL, TRUE};
 use crate::token::Token;
+use clap::arg;
 use std::rc::Rc;
 
 // pub fn eval_stmt(statement: Stmt) -> Object {}
@@ -125,7 +126,7 @@ fn extend_function_environment(
 ) -> Result<SharedEnv> {
     if args.len() != params.len() {
         return Err(EvalError::WrongNumberOfArguments(
-            format!("{} != {}", args.len(), params.len()),
+            format!("parameters {}, arguments {}", params.len(), args.len()),
             "extend_function_environment".to_string(),
         ));
     }
@@ -550,10 +551,10 @@ mod tests {
                 "if (2 > 1) { if (2 < 1) { return 1; } else { return true + true; } } else { return 2; };",
                 EvalError::UnknownOperator("+".to_string(), "eval_boolean_infix_expr".to_string())
             ),
-            // (
-            //     "let add = fn(a, b) { a + b }; add(1, 2, 3);",
-            //     EvalError::WrongNumberOfArguments("parameters 2, arguments 3".to_string(), "extend_function_environment".to_string())
-            // ),
+            (
+                "let add = fn(a, b) { a + b }; add(1, 2, 3);",
+                EvalError::WrongNumberOfArguments("parameters 2, arguments 3".to_string(), "extend_function_environment".to_string())
+            ),
             (
                 "\"Hello\" - \"Hello\"",
                 EvalError::UnknownOperator("-".to_string(), "eval_string_infix_expr".to_string())
@@ -679,37 +680,37 @@ mod tests {
             assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
-    //
-    // #[test]
-    // fn closures() {
-    //     let tests = vec![(
-    //         "let newAdder = fn(x) { fn(y) { x + y } }; let addTwo = newAdder(2); addTwo(2)",
-    //         Object::Integer(4),
-    //     )];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
-    // #[test]
-    // fn higher_order_functions() {
-    //     let tests = vec![(
-    //         "let add = fn(a, b) { a + b };
-    //              let applyFunc = fn(a, b, func) { func(a, b) };
-    //              applyFunc(2, 2, add);",
-    //         Object::Integer(4),
-    //     )];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
+
+    #[test]
+    fn closures() {
+        let tests = vec![(
+            "let newAdder = fn(x) { fn(y) { x + y } }; let addTwo = newAdder(2); addTwo(2)",
+            Object::Integer(4),
+        )];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
+
+    #[test]
+    fn higher_order_functions() {
+        let tests = vec![(
+            "let add = fn(a, b) { a + b };
+                 let applyFunc = fn(a, b, func) { func(a, b) };
+                 applyFunc(2, 2, add);",
+            Object::Integer(4),
+        )];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
+
     // #[test]
     // fn functional() {
     //     let tests = vec![
