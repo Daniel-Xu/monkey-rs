@@ -91,9 +91,71 @@ fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
         }
 
         Expr::Str(expr) => Ok(Object::Str(expr.clone())),
+        // a(2+2)
         Expr::Function(params, body) => Ok(Object::Function(params.clone(), body.clone(), env)),
+        Expr::Call(name, params) => eval_call_expr(name, params, env),
         _ => Err(NotImplemented),
     }
+}
+
+fn eval_call_expr(name: &Box<Expr>, params: &Vec<Expr>, env: SharedEnv) -> Result<Object> {
+    // function_object is getting from env with identifier
+    let function_object = eval_expression(name, Rc::clone(&env))?;
+    let v = eval_expressions(params, Rc::clone(&env))?;
+    apply_function(function_object, v)
+}
+
+fn apply_function(function_object: Object, args: Vec<Object>) -> Result<Object> {
+    match function_object {
+        Object::Function(params, body, env) => {
+            let extended_env = extend_function_environment(params, args, env)?;
+            match eval_block_stmts(&body, extended_env)? {
+                Object::ReturnValue(v) => Ok(*v),
+                o => Ok(o),
+            }
+        }
+        _ => Ok(Object::Null),
+    }
+}
+
+fn extend_function_environment(
+    params: Vec<Expr>,
+    args: Vec<Object>,
+    env: SharedEnv,
+) -> Result<SharedEnv> {
+    if args.len() != params.len() {
+        return Err(EvalError::WrongNumberOfArguments(
+            format!("{} != {}", args.len(), params.len()),
+            "extend_function_environment".to_string(),
+        ));
+    }
+
+    let extended_env = Environment::new_enclosed(env);
+    for i in 0..args.len() {
+        match &params[i] {
+            Expr::Identifier(id) => {
+                extended_env
+                    .borrow_mut()
+                    .set(id.to_string(), args[i].clone());
+            }
+            e => {
+                return Err(EvalError::ExpectedIdentifier(
+                    e.to_string(),
+                    "extend_function_environment".to_string(),
+                ))
+            }
+        }
+    }
+
+    Ok(extended_env)
+}
+
+fn eval_expressions(exprs: &Vec<Expr>, env: SharedEnv) -> Result<Vec<Object>> {
+    let mut res = Vec::new();
+    for expr in exprs {
+        res.push(eval_expression(expr, Rc::clone(&env))?)
+    }
+    Ok(res)
 }
 
 fn eval_if_expression(
@@ -128,10 +190,18 @@ fn eval_infix_expr(operator: &Token, left: Object, right: Object) -> Result<Obje
         (Object::Integer(n1), Object::Integer(n2)) => eval_interger_infix_expr(operator, n1, n2),
         (Object::Boolean(b1), Object::Boolean(b2)) => eval_boolean_infix_expr(operator, b1, b2),
         (Object::Str(s1), Object::Str(s2)) => eval_string_infix_expr(operator, s1, s2),
-        (left, right) => Err(EvalError::TypeMismatch(
-            format!("{} {} {}", left.debug_type(), operator, right.debug_type()),
-            "eval_infix_expr".to_string(),
-        )),
+        (left, right) => {
+            println!(
+                "{}, {}, {}",
+                left.to_string(),
+                right.to_string(),
+                operator.to_string()
+            );
+            Err(EvalError::TypeMismatch(
+                format!("{} {} {}", left.debug_type(), operator, right.debug_type()),
+                "eval_infix_expr".to_string(),
+            ))
+        }
     }
 }
 
@@ -549,12 +619,15 @@ mod tests {
 
     #[test]
     fn functions_objects_1() {
-        let tests = vec![("fn(x) { x + 2; };", "fn(x) (x + 2)".to_string())];
+        let tests = vec![
+            ("fn(x) { x + 2; };", "fn(x) (x + 2)".to_string()),
+            ("let fib = fn(i) { if (i==0) { return 1 } else { if (i==1) { return 1; } else { return fib(i-1) + fib(i-2); } } }; fib", 
+             "fn(i) if (i == 0) return 1; else if (i == 1) return 1; else return (fib((i - 1)) + fib((i - 2)));".to_string()),
+        ];
 
         for (input, expected) in tests {
             let program = Program::from_input(input);
             let env = Environment::new();
-            // let a = eval(program, env).unwrap().to_string();
             assert_eq!(
                 eval(program, env).unwrap().to_string(),
                 expected,
@@ -563,32 +636,49 @@ mod tests {
             );
         }
     }
-    //
-    // #[test]
-    // fn function_application() {
-    //     let tests = vec![
-    //         ("let identity = fn(x) { x; }; identity(5);", Object::Integer(5)),
-    //         ("let identity = fn(x) { return x; }; identity(5);", Object::Integer(5)),
-    //         ("let double = fn(x) { x * 2; }; double(5);", Object::Integer(10)),
-    //         ("let add = fn(x, y) { x + y; }; add(5, 5);", Object::Integer(10)),
-    //         ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", Object::Integer(20)),
-    //         ("fn(x) { x; }(5)", Object::Integer(5)),
-    //         ("fn(x) { return x; }(5)", Object::Integer(5)),
-    //         ("fn(x) { x; }(3 * 3)", Object::Integer(9)),
-    //         ("let factorial = fn(n) { if (n == 0) { 1 } else { n * factorial(n - 1) } }; factorial(5);", Object::Integer(120)),
-    //         ("let addThree = fn(x) { x + 3 }; let callTwoTimes = fn(x, func) { func(func(x)) }; callTwoTimes(3, addThree);", Object::Integer(9)),
-    //         ("let fib = fn(i) { if (i < 2) { 1 } else { fib(i-1) + fib(i-2); } }; fib(9)", Object::Integer(55)),
-    //         ("let fib = fn(i) { if (i==0) { return 1 } else { if (i==1) { return 1; } else { return fib(i-1) + fib(i-2); } } }; fib(9)", Object::Integer(55)),
-    //         ("let n = 3; let add_n = fn(x) { x + n; }; add_n(2)", Object::Integer(5)),
-    //         ("let n = 3; let add_n = fn(x) { x + n; }; let n = 1; add_n(2)", Object::Integer(3)), // not sure I like how environments behave
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
+
+    #[test]
+    fn function_application() {
+        let tests = vec![
+            (
+                "let identity = fn(x) { x; }; identity(5);",
+                Object::Integer(5),
+            ),
+            (
+                "let identity = fn(x) { return x; }; identity(5);",
+                Object::Integer(5),
+            ),
+            (
+                "let double = fn(x) { x * 2; }; double(5);",
+                Object::Integer(10),
+            ),
+            (
+                "let add = fn(x, y) { x + y; }; add(5, 5);",
+                Object::Integer(10),
+            ),
+            (
+                "let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));",
+                Object::Integer(20),
+            ),
+            ("fn(x) { x; }(5)", Object::Integer(5)),
+            ("fn(x) { return x; }(5)", Object::Integer(5)),
+            ("fn(x) { x; }(3 * 3)", Object::Integer(9)),
+            ("let factorial = fn(n) { if (n == 0) { 1 } else { n * factorial(n - 1) } }; factorial(5);", Object::Integer(120)),
+            ("let addThree = fn(x) { x + 3 }; let callTwoTimes = fn(x, func) { func(func(x)) }; callTwoTimes(3, addThree);", Object::Integer(9)),
+            ("let fib = fn(i) { if (i < 2) { 1 } else { fib(i-1) + fib(i-2); } }; fib(9)", Object::Integer(55)),
+            ("let fib = fn(i) { if (i==0) { return 1 } else { if (i==1) { return 1; } else { return fib(i-1) + fib(i-2); } } }; fib(9)", Object::Integer(55)),
+            ("let fib = fn(i) { if (i==0) { return 1 } else { if (i==1) { return 1; } else { return fib(i-1) + fib(i-2); } } }; fib(0)", Object::Integer(1)),
+            ("let fib = fn(i) { if (i==0) { return 1 } else { if (i==1) { return 1; } else { return fib(i-1) + fib(i-2); } } }; fib(1)", Object::Integer(1)),
+            ("let n = 3; let add_n = fn(x) { x + n; }; add_n(2)", Object::Integer(5)),
+            ("let n = 3; let add_n = fn(x) { x + n; }; let n = 1; add_n(2)", Object::Integer(3)), 
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
     //
     // #[test]
     // fn closures() {
