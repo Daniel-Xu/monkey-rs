@@ -1,8 +1,9 @@
 use crate::ast::Expr::Integer;
 use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::evaluator::EvalError::NotImplemented;
+use crate::object::builtin;
 use crate::object::environment::{Environment, SharedEnv};
-use crate::object::Object::{self};
+use crate::object::Object::{self, BuiltIn};
 use crate::object::{FALSE, NULL, TRUE};
 use crate::token::Token;
 use clap::arg;
@@ -73,10 +74,7 @@ pub fn eval_statement(stmt: &Stmt, env: SharedEnv) -> Result<Object> {
 
 fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
     match expr {
-        Expr::Identifier(id) => match env.borrow().get(id.to_string()) {
-            None => Err(NotImplemented),
-            Some(obj) => Ok(obj),
-        },
+        Expr::Identifier(id) => eval_identiier(id, Rc::clone(&env)),
         Expr::Integer(n) => Ok(Object::Integer(*n)),
         Expr::Prefix(token, inner) => eval_prefix_expr(token, eval_expression(inner, env)?),
 
@@ -99,6 +97,19 @@ fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
     }
 }
 
+fn eval_identiier(id: &str, env: SharedEnv) -> Result<Object> {
+    if let Some(obj) = env.borrow().get(id.to_string()) {
+        return Ok(obj);
+    }
+
+    // find string in builtin hashmap
+    if let Some(obj) = builtin::get(id) {
+        return Ok(obj);
+    }
+
+    Err(EvalError::NotImplemented)
+}
+
 fn eval_call_expr(name: &Expr, params: &[Expr], env: SharedEnv) -> Result<Object> {
     // function_object is getting from env with identifier
     let function_object = eval_expression(name, Rc::clone(&env))?;
@@ -115,6 +126,8 @@ fn apply_function(function_object: Object, args: Vec<Object>) -> Result<Object> 
                 o => Ok(o),
             }
         }
+        Object::BuiltIn(name, body) => body(args),
+
         _ => Ok(Object::Null),
     }
 }
@@ -765,55 +778,55 @@ mod tests {
     //     }
     // }
     //
-    // #[test]
-    // fn builtin_functions() {
-    //     let tests = vec![
-    //         ("len(\"\")", Object::Integer(0)),
-    //         ("len(\"four\")", Object::Integer(4)),
-    //         ("len(\"hiiiiiiiii\")", Object::Integer(10)),
-    //         ("len(\"hello\" + \" :)\")", Object::Integer(8)),
-    //         ("len([1,2,3,4,5])", Object::Integer(5)),
-    //         ("first([1,2,3,4,5])", Object::Integer(1)),
-    //         ("last([1,2,3,4,5])", Object::Integer(5)),
-    //         (
-    //             "rest([1,2,3,4,5])",
-    //             Object::Array(vec![
-    //                 Object::Integer(2),
-    //                 Object::Integer(3),
-    //                 Object::Integer(4),
-    //                 Object::Integer(5),
-    //             ]),
-    //         ),
-    //         (
-    //             "rest(rest([1,2,3,4,5]))",
-    //             Object::Array(vec![
-    //                 Object::Integer(3),
-    //                 Object::Integer(4),
-    //                 Object::Integer(5),
-    //             ]),
-    //         ),
-    //         (
-    //             "rest(rest(rest(rest(rest([1,2,3,4,5])))))",
-    //             Object::Array(vec![]),
-    //         ),
-    //         (
-    //             "push([1], 2)",
-    //             Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
-    //         ),
-    //         (
-    //             "let x = [1]; let x = push(x, 2); let x = push(x, 3); x",
-    //             Object::Array(vec![
-    //                 Object::Integer(1),
-    //                 Object::Integer(2),
-    //                 Object::Integer(3),
-    //             ]),
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
+    #[test]
+    fn builtin_functions() {
+        let tests = vec![
+            ("len(\"\")", Object::Integer(0)),
+            ("len(\"four\")", Object::Integer(4)),
+            ("len(\"hiiiiiiiii\")", Object::Integer(10)),
+            ("len(\"hello\" + \" :)\")", Object::Integer(8)),
+            // ("len([1,2,3,4,5])", Object::Integer(5)),
+            // ("first([1,2,3,4,5])", Object::Integer(1)),
+            // ("last([1,2,3,4,5])", Object::Integer(5)),
+            // (
+            //     "rest([1,2,3,4,5])",
+            //     Object::Array(vec![
+            //         Object::Integer(2),
+            //         Object::Integer(3),
+            //         Object::Integer(4),
+            //         Object::Integer(5),
+            //     ]),
+            // ),
+            // (
+            //     "rest(rest([1,2,3,4,5]))",
+            //     Object::Array(vec![
+            //         Object::Integer(3),
+            //         Object::Integer(4),
+            //         Object::Integer(5),
+            //     ]),
+            // ),
+            // (
+            //     "rest(rest(rest(rest(rest([1,2,3,4,5])))))",
+            //     Object::Array(vec![]),
+            // ),
+            // (
+            //     "push([1], 2)",
+            //     Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
+            // ),
+            // (
+            //     "let x = [1]; let x = push(x, 2); let x = push(x, 3); x",
+            //     Object::Array(vec![
+            //         Object::Integer(1),
+            //         Object::Integer(2),
+            //         Object::Integer(3),
+            //     ]),
+            // ),
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
 }

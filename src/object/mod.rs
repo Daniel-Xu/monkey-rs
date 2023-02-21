@@ -1,4 +1,5 @@
 use crate::ast::{pretty_print, BlockStmt, Expr};
+use crate::evaluator::EvalError;
 use crate::object::environment::{Environment, SharedEnv};
 use std::fmt::{Display, Formatter};
 
@@ -9,6 +10,7 @@ pub enum Object {
     ReturnValue(Box<Object>),
     Str(String),
     Function(Vec<Expr>, BlockStmt, SharedEnv), // this is definition, not invocation
+    BuiltIn(String, fn(Vec<Object>) -> Result<Object, EvalError>),
     Null,
 }
 
@@ -16,6 +18,7 @@ pub const TRUE: Object = Object::Boolean(true);
 pub const FALSE: Object = Object::Boolean(false);
 pub const NULL: Object = Object::Null;
 
+pub mod builtin;
 pub mod environment;
 
 impl Display for Object {
@@ -26,6 +29,7 @@ impl Display for Object {
             Object::Str(s) => write!(f, "{}", s),
             Object::Null => write!(f, "null"),
             Object::ReturnValue(object) => write!(f, "return {}", object),
+            Object::BuiltIn(name, body) => write!(f, "builtin"), // TODO
             Object::Function(params, body, env) => {
                 write!(f, "fn({}) {}", pretty_print(params), body)
             }
@@ -49,6 +53,7 @@ impl Object {
             Object::Null => "Null",
             Object::ReturnValue(_) => "Return",
             Object::Function(_, _, _) => "Function",
+            Object::BuiltIn(_, _) => "Builtin",
         }
         .to_string()
     }
