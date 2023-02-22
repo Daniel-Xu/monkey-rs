@@ -1,3 +1,4 @@
+use crate::ast::Expr::Array;
 use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::lexer::Lexer;
 use crate::token::Token::{self, *};
@@ -145,8 +146,9 @@ impl Parser {
             Token::Bang | Token::Minus => self.parse_prefix_expr(),
             Token::LParen => self.parse_group_expr(),
             Token::If => self.parse_if(),
-            Token::Function => self.parse_funcion_literal(),
+            Token::Function => self.parse_function_literal(),
             Token::Str(content) => Ok(Expr::Str(content.clone())),
+            Token::LBracket => self.parse_array_literal(),
             t => Err(ParserError::ExpectedPrefixToken(t.clone())),
         }
     }
@@ -309,7 +311,7 @@ impl Parser {
         Ok(Expr::If(Box::new(condition), if_block, else_block))
     }
 
-    fn parse_funcion_literal(&mut self) -> Result<Expr> {
+    fn parse_function_literal(&mut self) -> Result<Expr> {
         // fn(x, y) { x + y; }
         self.move_to_peek(Token::LParen, ParserError::ExpectedLParen)?;
         let args = self.parse_args()?;
@@ -383,6 +385,30 @@ impl Parser {
             self.move_to_peek(Token::RParen, ParserError::ExpectedRParen)?;
         }
         Ok(parameters)
+    }
+
+    // for every expr, when we finished parsing it, the current
+    // token should be the last token of the expr
+    // ] for array
+    // } for function
+    fn parse_array_literal(&mut self) -> Result<Expr> {
+        let items = self.parse_expr_list(Token::RBracket)?;
+        // pass ]
+        Ok(Array(items))
+    }
+
+    fn parse_expr_list(&mut self, end: Token) -> Result<Vec<Expr>> {
+        // [a, b, c]
+        // ^ current token
+        self.next_token();
+        let mut cur_expr = vec![];
+        while !self.cur_token_is(Token::RBracket) {
+            cur_expr.push(self.parse_expr(Lowest)?);
+            self.move_to_peek(Token::Comma, ParserError::ExpectedComma);
+            self.next_token(); // skip comma
+        }
+
+        Ok(cur_expr)
     }
 }
 
@@ -515,35 +541,35 @@ mod test_parser_expressions {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_array() {
-    //     let input = "[];
-    //                       [1, 2];
-    //                       [3, 4+5];
-    //                       [6, 7, \"hello\"];";
-    //
-    //     let program = Program::new(input);
-    //
-    //     let expected: Vec<Stmt> = vec![
-    //         Stmt::Expression(Expr::Array(vec![])),
-    //         Stmt::Expression(Expr::Array(vec![Expr::Integer(1), Expr::Integer(2)])),
-    //         Stmt::Expression(Expr::Array(vec![
-    //             Expr::Integer(3),
-    //             Expr::Infix(
-    //                 Box::new(Expr::Integer(4)),
-    //                 Token::Plus,
-    //                 Box::new(Expr::Integer(5)),
-    //             ),
-    //         ])),
-    //         Stmt::Expression(Expr::Array(vec![
-    //             Expr::Integer(6),
-    //             Expr::Integer(7),
-    //             Expr::Str("hello".to_string()),
-    //         ])),
-    //     ];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_array() {
+        let input = "[];
+                          [1, 2];
+                          [3, 4+5];
+                          [6, 7, \"hello\"];";
+
+        let program = Program::from_input(input);
+
+        let expected: Vec<Stmt> = vec![
+            Stmt::Expression(Expr::Array(vec![])),
+            Stmt::Expression(Expr::Array(vec![Expr::Integer(1), Expr::Integer(2)])),
+            Stmt::Expression(Expr::Array(vec![
+                Expr::Integer(3),
+                Expr::Infix(
+                    Box::new(Expr::Integer(4)),
+                    Token::Plus,
+                    Box::new(Expr::Integer(5)),
+                ),
+            ])),
+            Stmt::Expression(Expr::Array(vec![
+                Expr::Integer(6),
+                Expr::Integer(7),
+                Expr::Str("hello".to_string()),
+            ])),
+        ];
+
+        assert_eq!(program.statements, expected);
+    }
 
     // #[test]
     // fn test_index() {

@@ -16,6 +16,7 @@ pub enum Expr {
     If(Box<Expr>, BlockStmt, Option<BlockStmt>), // condition blocks blocks
     Function(Vec<Expr>, BlockStmt),              // parameter, blocks
     Call(Box<Expr>, Vec<Expr>),                  //identifer, parameter x(a, b, c)
+    Array(Vec<Expr>),                            // len, element type
 }
 
 impl Display for Expr {
@@ -35,6 +36,7 @@ impl Display for Expr {
                 write!(f, "fn({}) {}", pretty_print(parameter), block)
             }
             Expr::Call(name, parameter) => write!(f, "{}({})", name, pretty_print(parameter)),
+            Expr::Array(content) => write!(f, "{}", pretty_print(content)),
         }
     }
 }

@@ -128,7 +128,10 @@ fn apply_function(function_object: Object, args: Vec<Object>) -> Result<Object> 
         }
         Object::BuiltIn(name, body) => body(args),
 
-        _ => Ok(Object::Null),
+        o => Err(EvalError::TypeMismatch(
+            format!("{} is not a function", o.debug_type()),
+            "apply_function".to_string(),
+        )),
     }
 }
 
