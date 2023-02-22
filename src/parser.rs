@@ -199,7 +199,7 @@ impl Parser {
                     prefix = self.parse_infix(prefix)?;
                 }
                 Precedence::Call => {
-                    self.next_token(); // ( is current token
+                    self.next_token(); // ( is current token after this
                     prefix = self.parse_call_expr(prefix)?;
                 }
                 _ => break,
@@ -363,28 +363,9 @@ impl Parser {
     fn parse_call_expr(&mut self, left: Expr) -> Result<Expr> {
         // curent token is xx(xx, xx, xx)
         //                   ^
-        let parameters = self.parse_parameter_exprs()?;
+
+        let parameters = self.parse_expr_list(Token::RParen)?;
         Ok(Expr::Call(Box::new(left), parameters))
-    }
-
-    fn parse_parameter_exprs(&mut self) -> Result<Vec<Expr>> {
-        self.next_token();
-        let mut parameters = vec![];
-
-        if !self.cur_token_is(Token::RParen) {
-            let param = self.parse_expr(Lowest)?;
-            parameters.push(param);
-
-            while self.peek_token_is(Token::Comma) {
-                self.next_token();
-                self.next_token();
-                let param = self.parse_expr(Lowest)?;
-                parameters.push(param);
-            }
-
-            self.move_to_peek(Token::RParen, ParserError::ExpectedRParen)?;
-        }
-        Ok(parameters)
     }
 
     // for every expr, when we finished parsing it, the current
@@ -402,7 +383,7 @@ impl Parser {
         // ^ current token
         self.next_token();
         let mut cur_expr = vec![];
-        while !self.cur_token_is(Token::RBracket) {
+        while self.cur_token != end {
             cur_expr.push(self.parse_expr(Lowest)?);
             self.move_to_peek(Token::Comma, ParserError::ExpectedComma);
             self.next_token(); // skip comma
