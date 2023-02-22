@@ -202,6 +202,10 @@ impl Parser {
                     self.next_token(); // ( is current token after this
                     prefix = self.parse_call_expr(prefix)?;
                 }
+                Precedence::Index => {
+                    self.next_token();
+                    prefix = self.parse_index_expr(prefix)?;
+                }
                 _ => break,
             }
         }
@@ -391,6 +395,17 @@ impl Parser {
 
         Ok(cur_expr)
     }
+
+    fn parse_index_expr(&mut self, id: Expr) -> Result<Expr> {
+        // xx [
+        // prefix=> xx
+        // cur token is [
+
+        self.next_token();
+        let sub = self.parse_expr(Lowest)?;
+        self.move_to_peek(RBracket, ParserError::ExpectedRBracket);
+        Ok(Expr::Index(Box::new(id), Box::new(sub)))
+    }
 }
 
 #[cfg(test)]
@@ -552,19 +567,19 @@ mod test_parser_expressions {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_index() {
-    //     let input = "myArray[2]";
-    //
-    //     let program = Program::new(input);
-    //
-    //     let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Index(
-    //         Box::new(Expr::Identifier("myArray".to_string())),
-    //         Box::new(Expr::Integer(2)),
-    //     ))];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_index() {
+        let input = "myArray[2]";
+
+        let program = Program::from_input(input);
+
+        let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Index(
+            Box::new(Expr::Identifier("myArray".to_string())),
+            Box::new(Expr::Integer(2)),
+        ))];
+
+        assert_eq!(program.statements, expected);
+    }
 
     // #[test]
     // fn test_map_empty() {
