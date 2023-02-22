@@ -721,61 +721,61 @@ mod test_parser_expressions {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_operator_precedence_parsing() {
-    //     let tests: Vec<(&str, &str)> = vec![
-    //         ("-a * b", "((-a) * b)"),
-    //         ("!-a", "(!(-a))"),
-    //         ("a + b + c", "((a + b) + c)"),
-    //         ("a + b - c", "((a + b) - c)"),
-    //         ("a * b * c", "((a * b) * c)"),
-    //         ("a * b / c", "((a * b) / c)"),
-    //         ("a + b / c", "(a + (b / c))"),
-    //         ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
-    //         ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
-    //         ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
-    //         ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
-    //         (
-    //             "3 + 4 * 5 == 3 * 1 + 4 * 5",
-    //             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
-    //         ),
-    //         ("true", "true"),
-    //         ("false", "false"),
-    //         ("3 > 5 == false", "((3 > 5) == false)"),
-    //         ("3 < 5 == true", "((3 < 5) == true)"),
-    //         ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
-    //         ("(5 + 5) * 2", "((5 + 5) * 2)"),
-    //         ("2 / (5 + 5)", "(2 / (5 + 5))"),
-    //         ("-(5 + 5)", "(-(5 + 5))"),
-    //         ("!(true == true)", "(!(true == true))"),
-    //         ("(1 + 1)", "(1 + 1)"),
-    //         ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
-    //         (
-    //             "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
-    //             "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
-    //         ),
-    //         (
-    //             "add(a + b + c * d / f + g)",
-    //             "add((((a + b) + ((c * d) / f)) + g))",
-    //         ),
-    //         (
-    //             "a * [1, 2, 3, 4][b * c] * d",
-    //             "((a * ([1, 2, 3, 4][(b * c)])) * d)",
-    //         ),
-    //         (
-    //             "add(a * b[2], b[1], 2 * [1, 2][1])",
-    //             "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let lexer = Lexer::new(input.to_string());
-    //         let mut parser = Parser::new(lexer);
-    //         let program = parser.parse_program();
-    //         parser.check_parser_errors();
-    //         assert_eq!(program.to_string(), expected.to_string());
-    //     }
-    // }
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let tests: Vec<(&str, &str)> = vec![
+            ("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
+            ("(1 + 1)", "(1 + 1)"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
+            (
+                "a * [1, 2, 3, 4][b * c] * d",
+                "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            ),
+            (
+                "add(a * b[2], b[1], 2 * [1, 2][1])",
+                "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            parser.check_parser_errors();
+            assert_eq!(program.to_string(), expected.to_string());
+        }
+    }
 
     #[test]
     fn test_if_expression() {

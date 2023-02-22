@@ -37,7 +37,7 @@ impl Display for Expr {
                 write!(f, "fn({}) {}", pretty_print(parameter), block)
             }
             Expr::Call(name, parameter) => write!(f, "{}({})", name, pretty_print(parameter)),
-            Expr::Array(content) => write!(f, "{}", pretty_print(content)),
+            Expr::Array(content) => write!(f, "[{}]", pretty_print(content)),
             Expr::Index(id, subscription) => {
                 write!(f, "({}[{}])", id.to_string(), subscription.to_string())
             }
@@ -90,7 +90,14 @@ impl Display for BlockStmt {
 
 impl Display for Program {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        let s = self
+            .statements
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<String>>()
+            .join("");
+
+        write!(f, "{}", s)
     }
 }
 
