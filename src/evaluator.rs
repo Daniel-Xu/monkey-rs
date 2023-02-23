@@ -94,7 +94,36 @@ fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
         Expr::Function(params, body) => Ok(Object::Function(params.clone(), body.clone(), env)),
         Expr::Call(name, params) => eval_call_expr(name, params, env),
         Expr::Array(exprs) => eval_array_literal(exprs, env),
+        Expr::Index(id, sub) => {
+            let object_id = eval_expression(id, Rc::clone(&env))?;
+            let object_sub = eval_expression(sub, Rc::clone(&env))?;
+            eval_index_expression(object_id, object_sub, env)
+        }
         _ => Err(NotImplemented),
+    }
+}
+
+fn eval_index_expression(id: Object, sub: Object, env: SharedEnv) -> Result<Object> {
+    match (&id, &sub) {
+        (Object::Array(elements), Object::Integer(i)) => {
+            if *i < 0 {
+                Err(EvalError::IndexOutOfBounds(
+                    format!("negative indices not supported. index = {}", *i),
+                    "eval_index_expression".to_string(),
+                ))
+            } else if (*i as usize) > (elements.len() - 1) {
+                Err(EvalError::IndexOutOfBounds(
+                    format!("array length = {}, index = {}", elements.len(), *i as usize),
+                    "eval_index_expression".to_string(),
+                ))
+            } else {
+                Ok(elements[*i as usize].clone())
+            }
+        }
+        (_, _) => Err(EvalError::TypeMismatch(
+            format!("{},{}", id.to_string(), sub.to_string()),
+            "eval_index_expression".to_string(),
+        )),
     }
 }
 
@@ -418,31 +447,31 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn array_index_expressions() {
-    //     let tests = vec![
-    //         ("[1,2,3][0]", Object::Integer(1)),
-    //         ("[1,2,3][1]", Object::Integer(2)),
-    //         ("[1,2,3][2]", Object::Integer(3)),
-    //         ("let i = 0; [1,2,3][i]", Object::Integer(1)),
-    //         ("[1,2,3][1+1]", Object::Integer(3)),
-    //         ("let myArray = [1,2,3]; myArray[1]", Object::Integer(2)),
-    //         (
-    //             "let myArray = [1,2,3]; myArray[0] + myArray[1] + myArray[2]",
-    //             Object::Integer(6),
-    //         ),
-    //         (
-    //             "let myArray = [1,2,3]; let i = myArray[0]; myArray[i]",
-    //             Object::Integer(2),
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
+    #[test]
+    fn array_index_expressions() {
+        let tests = vec![
+            ("[1,2,3][0]", Object::Integer(1)),
+            ("[1,2,3][1]", Object::Integer(2)),
+            ("[1,2,3][2]", Object::Integer(3)),
+            ("let i = 0; [1,2,3][i]", Object::Integer(1)),
+            ("[1,2,3][1+1]", Object::Integer(3)),
+            ("let myArray = [1,2,3]; myArray[1]", Object::Integer(2)),
+            (
+                "let myArray = [1,2,3]; myArray[0] + myArray[1] + myArray[2]",
+                Object::Integer(6),
+            ),
+            (
+                "let myArray = [1,2,3]; let i = myArray[0]; myArray[i]",
+                Object::Integer(2),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
     //
     // #[test]
     // fn test_hash_literals() {
@@ -581,8 +610,8 @@ mod tests {
                 "\"Hello\" - \"Hello\"",
                 EvalError::UnknownOperator("-".to_string(), "eval_string_infix_expr".to_string())
             ),
-            // ("[1,2,3][3]", EvalError::IndexOutOfBounds("array length = 3, index = 3".to_string(), "eval_index_expression".to_string())),
-            // ("[1,2,3][-1]", EvalError::IndexOutOfBounds("negative indices not supported. index = -1".to_string(), "eval_index_expression".to_string())),
+            ("[1,2,3][3]", EvalError::IndexOutOfBounds("array length = 3, index = 3".to_string(), "eval_index_expression".to_string())),
+            ("[1,2,3][-1]", EvalError::IndexOutOfBounds("negative indices not supported. index = -1".to_string(), "eval_index_expression".to_string())),
             // ("{true: 2}[[1,2,3]]", EvalError::TypeMismatch("Array is not hashable".to_string(), "eval_index_expression".to_string())),
         ];
 

@@ -32,7 +32,7 @@ impl Display for Object {
             Object::ReturnValue(object) => write!(f, "return {}", object),
             Object::BuiltIn(name, body) => write!(f, "builtin"), // TODO
             Object::Array(objs) => write!(f, "[{}]", pretty_print(objs)),
-            Object::Function(params, body, env) => {
+            Object::Function(params, body, _env) => {
                 write!(f, "fn({}) {}", pretty_print(params), body)
             }
         }
