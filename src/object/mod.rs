@@ -11,6 +11,7 @@ pub enum Object {
     Str(String),
     Function(Vec<Expr>, BlockStmt, SharedEnv), // this is definition, not invocation
     BuiltIn(String, fn(Vec<Object>) -> Result<Object, EvalError>),
+    Array(Vec<Object>),
     Null,
 }
 
@@ -30,6 +31,7 @@ impl Display for Object {
             Object::Null => write!(f, "null"),
             Object::ReturnValue(object) => write!(f, "return {}", object),
             Object::BuiltIn(name, body) => write!(f, "builtin"), // TODO
+            Object::Array(objs) => write!(f, "[{}]", pretty_print(objs)),
             Object::Function(params, body, env) => {
                 write!(f, "fn({}) {}", pretty_print(params), body)
             }
@@ -54,6 +56,7 @@ impl Object {
             Object::ReturnValue(_) => "Return",
             Object::Function(_, _, _) => "Function",
             Object::BuiltIn(_, _) => "Builtin",
+            Object::Array(_) => "Array",
         }
         .to_string()
     }

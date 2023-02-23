@@ -93,8 +93,14 @@ fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
         // a(2+2)
         Expr::Function(params, body) => Ok(Object::Function(params.clone(), body.clone(), env)),
         Expr::Call(name, params) => eval_call_expr(name, params, env),
+        Expr::Array(exprs) => eval_array_literal(exprs, env),
         _ => Err(NotImplemented),
     }
+}
+
+fn eval_array_literal(exprs: &Vec<Expr>, env: SharedEnv) -> Result<Object> {
+    let v = eval_expressions(exprs, Rc::clone(&env))?;
+    Ok(Object::Array(v))
 }
 
 fn eval_identiier(id: &str, env: SharedEnv) -> Result<Object> {
@@ -394,24 +400,24 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn array_literals() {
-    //     let tests = vec![
-    //         ("[]", Object::Array(vec![])),
-    //         ("[1]", Object::Array(vec![Object::Integer(1)])),
-    //         (
-    //             "[1, 2]",
-    //             Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
+    #[test]
+    fn array_literals() {
+        let tests = vec![
+            ("[]", Object::Array(vec![])),
+            ("[1]", Object::Array(vec![Object::Integer(1)])),
+            (
+                "[1, 2]",
+                Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
+
     // #[test]
     // fn array_index_expressions() {
     //     let tests = vec![
