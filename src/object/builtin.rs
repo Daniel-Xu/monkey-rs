@@ -25,6 +25,7 @@ fn len(args: Vec<Object>) -> BuiltinResult {
     assert_args(&args, 1, "len")?;
     match &args[0] {
         Object::Str(content) => Ok(Object::Integer(content.len() as i32)),
+        Object::Array(elements) => Ok(Object::Integer(elements.len() as i32)),
         _ => Err(EvalError::TypeMismatch(
             format!("{}", args[0].debug_type()),
             "len".to_string(),

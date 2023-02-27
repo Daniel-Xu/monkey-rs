@@ -628,7 +628,7 @@ mod tests {
             ),
             ("[1,2,3][3]", EvalError::IndexOutOfBounds("array length = 3, index = 3".to_string(), "eval_index_expression".to_string())),
             ("[1,2,3][-1]", EvalError::IndexOutOfBounds("negative indices not supported. index = -1".to_string(), "eval_index_expression".to_string())),
-            // ("{true: 2}[[1,2,3]]", EvalError::TypeMismatch("Array is not hashable".to_string(), "eval_index_expression".to_string())),
+            ("{true: 2}[[1,2,3]]", EvalError::TypeMismatch("Array is not hashable".to_string(), "eval_index_expression".to_string())),
         ];
 
         for (input, expected) in tests {
@@ -778,60 +778,60 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn functional() {
-    //     let tests = vec![
-    //         (
-    //             "
-    //         let map = fn(f, xs) {
-    //             let iter = fn(accumulated, remaining) {
-    //                 if (len(remaining) == 0) {
-    //                     accumulated
-    //                 } else {
-    //                     iter(push(accumulated, f(first(remaining))), rest(remaining))
-    //                 }
-    //             };
-    //             iter([], xs)
-    //         };
-    //         let square = fn(x) {
-    //             x*x
-    //         };
-    //         let array = [1, 2, 3, 4];
-    //         map(square, array)
-    //         ",
-    //             Object::Array(vec![
-    //                 Object::Integer(1),
-    //                 Object::Integer(4),
-    //                 Object::Integer(9),
-    //                 Object::Integer(16),
-    //             ]),
-    //         ),
-    //         (
-    //             "
-    //         let reduce = fn(acc, f, xs) {
-    //             let iter = fn(acc, xs) {
-    //                 if (len(xs)==0) {
-    //                     acc
-    //                 } else {
-    //                     iter(f(acc, first(xs)), rest(xs))
-    //                 }
-    //             };
-    //             iter(acc, xs)
-    //         }
-    //         let array = [1, 2, 3, 4];
-    //         reduce(0, fn(a, b){a + b}, array)
-    //         ",
-    //             Object::Integer(10),
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
+    #[test]
+    fn functional() {
+        let tests = vec![
+            (
+                "
+            let map = fn(f, xs) {
+                let iter = fn(accumulated, remaining) {
+                    if (len(remaining) == 0) {
+                        accumulated
+                    } else {
+                        iter(push(accumulated, f(first(remaining))), rest(remaining))
+                    }
+                };
+                iter([], xs)
+            };
+            let square = fn(x) {
+                x*x
+            };
+            let array = [1, 2, 3, 4];
+            map(square, array)
+            ",
+                Object::Array(vec![
+                    Object::Integer(1),
+                    Object::Integer(4),
+                    Object::Integer(9),
+                    Object::Integer(16),
+                ]),
+            ),
+            (
+                "
+            let reduce = fn(acc, f, xs) {
+                let iter = fn(acc, xs) {
+                    if (len(xs)==0) {
+                        acc
+                    } else {
+                        iter(f(acc, first(xs)), rest(xs))
+                    }
+                };
+                iter(acc, xs)
+            }
+            let array = [1, 2, 3, 4];
+            reduce(0, fn(a, b){a + b}, array)
+            ",
+                Object::Integer(10),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
+
     #[test]
     fn builtin_functions() {
         let tests = vec![
@@ -839,7 +839,7 @@ mod tests {
             ("len(\"four\")", Object::Integer(4)),
             ("len(\"hiiiiiiiii\")", Object::Integer(10)),
             ("len(\"hello\" + \" :)\")", Object::Integer(8)),
-            // ("len([1,2,3,4,5])", Object::Integer(5)),
+            ("len([1,2,3,4,5])", Object::Integer(5)),
             // ("first([1,2,3,4,5])", Object::Integer(1)),
             // ("last([1,2,3,4,5])", Object::Integer(5)),
             // (
