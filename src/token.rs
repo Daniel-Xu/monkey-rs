@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 
 #[derive(PartialEq, Debug, Eq, Clone)]
 pub enum Token {

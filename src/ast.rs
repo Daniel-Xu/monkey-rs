@@ -15,9 +15,10 @@ pub enum Expr {
     Infix(Box<Expr>, Token, Box<Expr>),          //left, token, right // TODO: change this to struct
     If(Box<Expr>, BlockStmt, Option<BlockStmt>), // condition blocks blocks
     Function(Vec<Expr>, BlockStmt),              // parameter, blocks
-    Call(Box<Expr>, Vec<Expr>),                  //identifer, parameter x(a, b, c)
+    Call(Box<Expr>, Vec<Expr>),                  //identifier, parameter x(a, b, c)
     Array(Vec<Expr>),                            // len, element type
-    Index(Box<Expr>, Box<Expr>),                 // identifier + [ + expr
+    Index(Box<Expr>, Box<Expr>),                 // identifier + [/{ + expr
+    Hash(Vec<(Expr, Expr)>), // Vec<(expr expr)>, because we don't need to keep it around, we don't need to use hashmap here
 }
 
 impl Display for Expr {
@@ -38,6 +39,7 @@ impl Display for Expr {
             }
             Expr::Call(name, parameter) => write!(f, "{}({})", name, pretty_print(parameter)),
             Expr::Array(content) => write!(f, "[{}]", pretty_print(content)),
+            Expr::Hash(content) => write!(f, "{}", 1),
             Expr::Index(id, subscription) => {
                 write!(f, "({}[{}])", id.to_string(), subscription.to_string())
             }

@@ -1,7 +1,9 @@
 use crate::ast::{pretty_print, BlockStmt, Expr};
 use crate::evaluator::EvalError;
-use crate::object::environment::{Environment, SharedEnv};
+use crate::object::environment::SharedEnv;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Object {
@@ -12,6 +14,7 @@ pub enum Object {
     Function(Vec<Expr>, BlockStmt, SharedEnv), // this is definition, not invocation
     BuiltIn(String, fn(Vec<Object>) -> Result<Object, EvalError>),
     Array(Vec<Object>),
+    Hash(HashMap<Object, Object>),
     Null,
 }
 
@@ -35,6 +38,20 @@ impl Display for Object {
             Object::Function(params, body, _env) => {
                 write!(f, "fn({}) {}", pretty_print(params), body)
             }
+            Object::Hash(_) => {
+                write!(f, "{}", "todo")
+            }
+        }
+    }
+}
+
+impl Hash for Object {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Object::Integer(i) => i.hash(state),
+            Object::Boolean(b) => b.hash(state),
+            Object::Str(s) => s.hash(state),
+            _ => 0.hash(state),
         }
     }
 }
@@ -57,6 +74,7 @@ impl Object {
             Object::Function(_, _, _) => "Function",
             Object::BuiltIn(_, _) => "Builtin",
             Object::Array(_) => "Array",
+            Object::Hash(_) => "Hash",
         }
         .to_string()
     }

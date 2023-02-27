@@ -1,12 +1,11 @@
-use crate::ast::Expr::Integer;
 use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::evaluator::EvalError::NotImplemented;
 use crate::object::builtin;
 use crate::object::environment::{Environment, SharedEnv};
-use crate::object::Object::{self, BuiltIn};
+use crate::object::Object::{self};
 use crate::object::{FALSE, NULL, TRUE};
 use crate::token::Token;
-use clap::arg;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 // pub fn eval_stmt(statement: Stmt) -> Object {}
@@ -46,9 +45,7 @@ fn eval_block_stmts(block: &BlockStmt, env: SharedEnv) -> Result<Object> {
     for stmt in &block.statements {
         result = eval_statement(stmt, Rc::clone(&env))?;
 
-        /**
-         * we should still return ReturnValue so it can be handle correctly in eval()
-         */
+        // we should still return ReturnValue so it can be handle correctly in eval()
         if matches!(result, Object::ReturnValue(_)) {
             break;
         }
@@ -67,8 +64,7 @@ pub fn eval_statement(stmt: &Stmt, env: SharedEnv) -> Result<Object> {
             let v = eval_expression(expr, Rc::clone(&env))?;
             env.borrow_mut().set(identifier.to_string(), v);
             Ok(NULL)
-        }
-        _ => Err(NotImplemented),
+        } // _ => Err(NotImplemented),
     }
 }
 
@@ -94,17 +90,28 @@ fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
         Expr::Function(params, body) => Ok(Object::Function(params.clone(), body.clone(), env)),
         Expr::Call(name, params) => eval_call_expr(name, params, env),
         Expr::Array(exprs) => eval_array_literal(exprs, env),
-        Expr::Index(id, sub) => {
-            let object_id = eval_expression(id, Rc::clone(&env))?;
-            let object_sub = eval_expression(sub, Rc::clone(&env))?;
-            eval_index_expression(object_id, object_sub, env)
-        }
+        Expr::Hash(exprs) => eval_hash_literal(exprs, env),
+        Expr::Index(id, sub) => eval_index_expression(id, sub, env),
         _ => Err(NotImplemented),
     }
 }
 
-fn eval_index_expression(id: Object, sub: Object, env: SharedEnv) -> Result<Object> {
-    match (&id, &sub) {
+fn eval_hash_literal(exprs: &[(Expr, Expr)], env: SharedEnv) -> Result<Object> {
+    let mut map = HashMap::new();
+    for (key, value) in exprs {
+        let key_obj = eval_expression(key, Rc::clone(&env))?;
+        let value_obj = eval_expression(value, Rc::clone(&env))?;
+
+        map.insert(key_obj, value_obj);
+    }
+
+    Ok(Object::Hash(map))
+}
+
+fn eval_index_expression(id: &Expr, sub: &Expr, env: SharedEnv) -> Result<Object> {
+    let object_id = eval_expression(id, Rc::clone(&env))?;
+    let object_sub = eval_expression(sub, Rc::clone(&env))?;
+    match (&object_id, &object_sub) {
         (Object::Array(elements), Object::Integer(i)) => {
             if *i < 0 {
                 Err(EvalError::IndexOutOfBounds(
@@ -120,8 +127,9 @@ fn eval_index_expression(id: Object, sub: Object, env: SharedEnv) -> Result<Obje
                 Ok(elements[*i as usize].clone())
             }
         }
+        // (Object::Hash())
         (_, _) => Err(EvalError::TypeMismatch(
-            format!("{},{}", id.to_string(), sub.to_string()),
+            format!("{},{}", object_id.to_string(), object_sub.to_string()),
             "eval_index_expression".to_string(),
         )),
     }
@@ -319,9 +327,8 @@ fn eval_prefix_expr(token: &Token, object: Object) -> Result<Object> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn integer_expression() {
@@ -472,53 +479,53 @@ mod tests {
             assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
         }
     }
-    //
-    // #[test]
-    // fn test_hash_literals() {
-    //     let map_1 = HashMap::new();
-    //     let mut map_2 = HashMap::new();
-    //     map_2.insert(Object::Integer(2), Object::Str("two".to_string()));
-    //     map_2.insert(TRUE, Object::Integer(3));
-    //     map_2.insert(Object::Str("four".to_string()), Object::Integer(4));
-    //     map_2.insert(Object::Str("five".to_string()), Object::Integer(5));
-    //
-    //     let tests = vec![
-    //         ("{}", Object::Hash(map_1)),
-    //         (
-    //             "let five = \"five\";
-    //           {
-    //             2: \"two\",
-    //             true: 3,
-    //             \"fo\" + \"ur\": 4,
-    //             five: 5,
-    //           }",
-    //             Object::Hash(map_2),
-    //         ),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
-    // #[test]
-    // fn test_hash_index_expressions() {
-    //     let tests = vec![
-    //         ("{}[1]", NULL),
-    //         ("{\"one\": 1}[\"one\"]", Object::Integer(1)),
-    //         ("{2: true}[2]", TRUE),
-    //         ("{false: 1, false: 2}[false]", Object::Integer(2)),
-    //     ];
-    //
-    //     for (input, expected) in tests {
-    //         let program = Program::new(input);
-    //         let env = Environment::new();
-    //         assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
-    //     }
-    // }
-    //
+
+    #[test]
+    fn test_hash_literals() {
+        let map_1 = HashMap::new();
+        let mut map_2 = HashMap::new();
+        map_2.insert(Object::Integer(2), Object::Str("two".to_string()));
+        map_2.insert(TRUE, Object::Integer(3));
+        map_2.insert(Object::Str("four".to_string()), Object::Integer(4));
+        map_2.insert(Object::Str("five".to_string()), Object::Integer(5));
+
+        let tests = vec![
+            ("{}", Object::Hash(map_1)),
+            (
+                "let five = \"five\";
+              {
+                2: \"two\",
+                true: 3,
+                \"fo\" + \"ur\": 4,
+                five: 5,
+              }",
+                Object::Hash(map_2),
+            ),
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
+
+    #[test]
+    fn test_hash_index_expressions() {
+        let tests = vec![
+            ("{}[1]", NULL),
+            ("{\"one\": 1}[\"one\"]", Object::Integer(1)),
+            ("{2: true}[2]", TRUE),
+            ("{false: 1, false: 2}[false]", Object::Integer(2)),
+        ];
+
+        for (input, expected) in tests {
+            let program = Program::from_input(input);
+            let env = Environment::new();
+            assert_eq!(eval(program, env).unwrap(), expected, "{}", input);
+        }
+    }
+
     #[test]
     fn bang_operator() {
         let tests = vec![

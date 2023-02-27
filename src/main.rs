@@ -10,7 +10,7 @@ mod token;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::io::{self, BufRead};
-use std::mem::size_of;
+
 fn main() {
     let stdin = io::stdin();
     // std error is unbuffered!!!

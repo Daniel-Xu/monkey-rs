@@ -1,7 +1,8 @@
-use crate::ast::Expr::Array;
+use crate::ast::Expr::{Array, Hash};
 use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::lexer::Lexer;
 use crate::token::Token::{self, *};
+use std::collections::HashMap;
 use Precedence::*;
 
 #[derive(Debug)]
@@ -17,6 +18,7 @@ pub enum ParserError {
     ExpectedToken { expected: Token, got: Token },
     ExpectedRBrace(Token),
     ExpectedPrefixToken(Token),
+    WrongEnding(Token),
     UnknownError,
 }
 
@@ -149,6 +151,7 @@ impl Parser {
             Token::Function => self.parse_function_literal(),
             Token::Str(content) => Ok(Expr::Str(content.clone())),
             Token::LBracket => self.parse_array_literal(),
+            Token::LBrace => self.parse_hash_literal(),
             t => Err(ParserError::ExpectedPrefixToken(t.clone())),
         }
     }
@@ -389,8 +392,13 @@ impl Parser {
         let mut cur_expr = vec![];
         while self.cur_token != end {
             cur_expr.push(self.parse_expr(Lowest)?);
-            self.move_to_peek(Token::Comma, ParserError::ExpectedComma);
-            self.next_token(); // skip comma
+            if self.peek_token_is(Token::Comma) {
+                self.next_token(); // move to comma
+                self.next_token(); // skip comma
+            } else {
+                // move to ]
+                self.move_to_peek(end.clone(), ParserError::WrongEnding)?;
+            }
         }
 
         Ok(cur_expr)
@@ -403,8 +411,30 @@ impl Parser {
 
         self.next_token();
         let sub = self.parse_expr(Lowest)?;
-        self.move_to_peek(RBracket, ParserError::ExpectedRBracket);
+        self.move_to_peek(RBracket, ParserError::ExpectedRBracket)?;
         Ok(Expr::Index(Box::new(id), Box::new(sub)))
+    }
+
+    fn parse_hash_literal(&mut self) -> Result<Expr> {
+        // {a: b, c: d, e: f}
+        // ^ current token
+        self.next_token();
+        let mut cur_expr = Vec::new();
+        while self.cur_token != Token::RBrace {
+            let key = self.parse_expr(Lowest)?;
+            self.move_to_peek(Token::Colon, ParserError::ExpectedColon)?;
+            self.next_token(); // skip comma
+            let value = self.parse_expr(Lowest)?;
+            cur_expr.push((key, value));
+            if self.peek_token_is(Token::Comma) {
+                self.next_token(); // move to comma
+                self.next_token(); // skip comma
+            } else {
+                self.move_to_peek(Token::RBrace, ParserError::ExpectedRBrace)?;
+            }
+        }
+
+        Ok(Hash(cur_expr))
     }
 }
 
@@ -581,43 +611,43 @@ mod test_parser_expressions {
         assert_eq!(program.statements, expected);
     }
 
-    // #[test]
-    // fn test_map_empty() {
-    //     let input = "{}";
-    //     let program = Program::new(input);
-    //
-    //     let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Hash(vec![]))];
-    //
-    //     assert_eq!(program.statements, expected);
-    // }
+    #[test]
+    fn test_map_empty() {
+        let input = "{}";
+        let program = Program::from_input(input);
 
-    // #[test]
-    // fn test_map_strings() {
-    //     let input = "{\"one\": 1, \"two\": 2, \"three\": 3};
-    //                       {1: \"one\", 23: \"two\" + \"three\"}";
-    //
-    //     let program = Program::new(input);
-    //
-    //     let expected: Vec<Stmt> = vec![
-    //         Stmt::Expression(Expr::Hash(vec![
-    //             (Expr::Str("one".to_string()), Expr::Integer(1)),
-    //             (Expr::Str("two".to_string()), Expr::Integer(2)),
-    //             (Expr::Str("three".to_string()), Expr::Integer(3)),
-    //         ])),
-    //         Stmt::Expression(Expr::Hash(vec![
-    //             (Expr::Integer(1), Expr::Str("one".to_string())),
-    //             (
-    //                 Expr::Integer(23),
-    //                 Expr::Infix(
-    //                     Box::new(Expr::Str("two".to_string())),
-    //                     Token::Plus,
-    //                     Box::new(Expr::Str("three".to_string())),
-    //                 ),
-    //             ),
-    //         ])),
-    //     ];
-    //     assert_eq!(program.statements, expected);
-    // }
+        let expected: Vec<Stmt> = vec![Stmt::Expression(Expr::Hash(vec![]))];
+
+        assert_eq!(program.statements, expected);
+    }
+
+    #[test]
+    fn test_map_strings() {
+        let input = "{\"one\": 1, \"two\": 2, \"three\": 3};
+                          {1: \"one\", 23: \"two\" + \"three\"}";
+
+        let program = Program::from_input(input);
+
+        let expected: Vec<Stmt> = vec![
+            Stmt::Expression(Expr::Hash(vec![
+                (Expr::Str("one".to_string()), Expr::Integer(1)),
+                (Expr::Str("two".to_string()), Expr::Integer(2)),
+                (Expr::Str("three".to_string()), Expr::Integer(3)),
+            ])),
+            Stmt::Expression(Expr::Hash(vec![
+                (Expr::Integer(1), Expr::Str("one".to_string())),
+                (
+                    Expr::Integer(23),
+                    Expr::Infix(
+                        Box::new(Expr::Str("two".to_string())),
+                        Token::Plus,
+                        Box::new(Expr::Str("three".to_string())),
+                    ),
+                ),
+            ])),
+        ];
+        assert_eq!(program.statements, expected);
+    }
 
     #[test]
     fn test_prefix_expression() {
