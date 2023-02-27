@@ -840,41 +840,41 @@ mod tests {
             ("len(\"hiiiiiiiii\")", Object::Integer(10)),
             ("len(\"hello\" + \" :)\")", Object::Integer(8)),
             ("len([1,2,3,4,5])", Object::Integer(5)),
-            // ("first([1,2,3,4,5])", Object::Integer(1)),
-            // ("last([1,2,3,4,5])", Object::Integer(5)),
-            // (
-            //     "rest([1,2,3,4,5])",
-            //     Object::Array(vec![
-            //         Object::Integer(2),
-            //         Object::Integer(3),
-            //         Object::Integer(4),
-            //         Object::Integer(5),
-            //     ]),
-            // ),
-            // (
-            //     "rest(rest([1,2,3,4,5]))",
-            //     Object::Array(vec![
-            //         Object::Integer(3),
-            //         Object::Integer(4),
-            //         Object::Integer(5),
-            //     ]),
-            // ),
-            // (
-            //     "rest(rest(rest(rest(rest([1,2,3,4,5])))))",
-            //     Object::Array(vec![]),
-            // ),
-            // (
-            //     "push([1], 2)",
-            //     Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
-            // ),
-            // (
-            //     "let x = [1]; let x = push(x, 2); let x = push(x, 3); x",
-            //     Object::Array(vec![
-            //         Object::Integer(1),
-            //         Object::Integer(2),
-            //         Object::Integer(3),
-            //     ]),
-            // ),
+            ("first([1,2,3,4,5])", Object::Integer(1)),
+            ("last([1,2,3,4,5])", Object::Integer(5)),
+            (
+                "rest([1,2,3,4,5])",
+                Object::Array(vec![
+                    Object::Integer(2),
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                ]),
+            ),
+            (
+                "rest(rest([1,2,3,4,5]))",
+                Object::Array(vec![
+                    Object::Integer(3),
+                    Object::Integer(4),
+                    Object::Integer(5),
+                ]),
+            ),
+            (
+                "rest(rest(rest(rest(rest([1,2,3,4,5])))))",
+                Object::Array(vec![]),
+            ),
+            (
+                "push([1], 2)",
+                Object::Array(vec![Object::Integer(1), Object::Integer(2)]),
+            ),
+            (
+                "let x = [1]; let x = push(x, 2); let x = push(x, 3); x",
+                Object::Array(vec![
+                    Object::Integer(1),
+                    Object::Integer(2),
+                    Object::Integer(3),
+                ]),
+            ),
         ];
 
         for (input, expected) in tests {
