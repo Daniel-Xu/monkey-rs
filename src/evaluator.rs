@@ -127,7 +127,16 @@ fn eval_index_expression(id: &Expr, sub: &Expr, env: SharedEnv) -> Result<Object
                 Ok(elements[*i as usize].clone())
             }
         }
-        // (Object::Hash())
+        (Object::Hash(elements), key) => match key {
+            Object::Integer(_) | Object::Boolean(_) | Object::Str(_) => match elements.get(key) {
+                Some(o) => Ok(o.clone()),
+                None => Ok(NULL),
+            },
+            o => Err(EvalError::TypeMismatch(
+                format!("{} is not hashable", o.debug_type()),
+                "eval_index_expression".to_string(),
+            )),
+        },
         (_, _) => Err(EvalError::TypeMismatch(
             format!("{},{}", object_id.to_string(), object_sub.to_string()),
             "eval_index_expression".to_string(),
