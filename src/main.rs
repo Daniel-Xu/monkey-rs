@@ -11,7 +11,7 @@ use crate::ast::Program;
 use crate::evaluator::eval;
 use crate::object::environment::Environment;
 use crate::object::NULL;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead};
 use std::rc::Rc;
 
 fn main() {
