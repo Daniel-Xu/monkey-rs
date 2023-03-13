@@ -6,6 +6,7 @@ use crate::object::Object::{self};
 use crate::object::{FALSE, NULL, TRUE};
 use crate::token::Token;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::rc::Rc;
 
 // pub fn eval_stmt(statement: Stmt) -> Object {}
@@ -16,13 +17,37 @@ pub type Result<T> = std::result::Result<T, EvalError>;
 pub enum EvalError {
     TypeMismatch(String, String),
     UnknownOperator(String, String),
-    // SyntaxError(String, String),
     IdentifierNotFound(String, String),
     ExpectedIdentifier(String, String),
     WrongNumberOfArguments(String, String),
     IndexOutOfBounds(String, String),
     NotImplemented,
 }
+impl Display for EvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        match self {
+            EvalError::TypeMismatch(s, func) => write!(f, "type mismatch: {s} in {func}"),
+            EvalError::UnknownOperator(s, func) => write!(f, "unknown operator: {s} in {func}"),
+            EvalError::IdentifierNotFound(s, func) => {
+                write!(f, "identifier not found: {s} in {func}")
+            }
+            EvalError::ExpectedIdentifier(s, func) => {
+                write!(f, "expected identifier: {s} in {func}")
+            }
+            EvalError::WrongNumberOfArguments(s, func) => {
+                write!(f, "wrong number of arguments: {s} in {func}")
+            }
+            EvalError::IndexOutOfBounds(s, func) => {
+                write!(f, "index out of bounds: {s} in {func}")
+            }
+
+            EvalError::NotImplemented => {
+                write!(f, "not implemented")
+            }
+        }
+    }
+}
+
 pub fn eval(program: Program, env: SharedEnv) -> Result<Object> {
     let mut result = NULL;
     for stmt in &program.statements {
@@ -70,7 +95,7 @@ pub fn eval_statement(stmt: &Stmt, env: SharedEnv) -> Result<Object> {
 
 fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
     match expr {
-        Expr::Identifier(id) => eval_identiier(id, Rc::clone(&env)),
+        Expr::Identifier(id) => eval_identifier(id, Rc::clone(&env)),
         Expr::Integer(n) => Ok(Object::Integer(*n)),
         Expr::Prefix(token, inner) => eval_prefix_expr(token, eval_expression(inner, env)?),
 
@@ -92,7 +117,6 @@ fn eval_expression(expr: &Expr, env: SharedEnv) -> Result<Object> {
         Expr::Array(exprs) => eval_array_literal(exprs, env),
         Expr::Hash(exprs) => eval_hash_literal(exprs, env),
         Expr::Index(id, sub) => eval_index_expression(id, sub, env),
-        _ => Err(NotImplemented),
     }
 }
 
@@ -149,7 +173,7 @@ fn eval_array_literal(exprs: &Vec<Expr>, env: SharedEnv) -> Result<Object> {
     Ok(Object::Array(v))
 }
 
-fn eval_identiier(id: &str, env: SharedEnv) -> Result<Object> {
+fn eval_identifier(id: &str, env: SharedEnv) -> Result<Object> {
     if let Some(obj) = env.borrow().get(id.to_string()) {
         return Ok(obj);
     }
@@ -159,7 +183,10 @@ fn eval_identiier(id: &str, env: SharedEnv) -> Result<Object> {
         return Ok(obj);
     }
 
-    Err(EvalError::NotImplemented)
+    Err(EvalError::IdentifierNotFound(
+        id.to_string(),
+        "eval_identifier".to_string(),
+    ))
 }
 
 fn eval_call_expr(name: &Expr, params: &[Expr], env: SharedEnv) -> Result<Object> {
@@ -178,7 +205,7 @@ fn apply_function(function_object: Object, args: Vec<Object>) -> Result<Object> 
                 o => Ok(o),
             }
         }
-        Object::BuiltIn(name, body) => body(args),
+        Object::BuiltIn(_name, body) => body(args),
 
         o => Err(EvalError::TypeMismatch(
             format!("{} is not a function", o.debug_type()),
@@ -259,18 +286,10 @@ fn eval_infix_expr(operator: &Token, left: Object, right: Object) -> Result<Obje
         (Object::Integer(n1), Object::Integer(n2)) => eval_interger_infix_expr(operator, n1, n2),
         (Object::Boolean(b1), Object::Boolean(b2)) => eval_boolean_infix_expr(operator, b1, b2),
         (Object::Str(s1), Object::Str(s2)) => eval_string_infix_expr(operator, s1, s2),
-        (left, right) => {
-            println!(
-                "{}, {}, {}",
-                left.to_string(),
-                right.to_string(),
-                operator.to_string()
-            );
-            Err(EvalError::TypeMismatch(
-                format!("{} {} {}", left.debug_type(), operator, right.debug_type()),
-                "eval_infix_expr".to_string(),
-            ))
-        }
+        (left, right) => Err(EvalError::TypeMismatch(
+            format!("{} {} {}", left.debug_type(), operator, right.debug_type()),
+            "eval_infix_expr".to_string(),
+        )),
     }
 }
 

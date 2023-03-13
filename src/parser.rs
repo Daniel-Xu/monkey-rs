@@ -2,7 +2,6 @@ use crate::ast::Expr::{Array, Hash};
 use crate::ast::{BlockStmt, Expr, Program, Stmt};
 use crate::lexer::Lexer;
 use crate::token::Token::{self, *};
-use std::collections::HashMap;
 use Precedence::*;
 
 #[derive(Debug)]
@@ -14,12 +13,9 @@ pub enum ParserError {
     ExpectedLBrace(Token),
     ExpectedRBracket(Token),
     ExpectedColon(Token),
-    ExpectedComma(Token),
-    ExpectedToken { expected: Token, got: Token },
     ExpectedRBrace(Token),
     ExpectedPrefixToken(Token),
     WrongEnding(Token),
-    UnknownError,
 }
 
 #[derive(PartialEq, PartialOrd)]
@@ -259,7 +255,7 @@ impl Parser {
         Ok(Stmt::Let(id, expr))
     }
 
-    pub fn check_parser_errors(&self) {
+    fn check_parser_errors(&self) {
         if self.errors.is_empty() {
             return;
         }

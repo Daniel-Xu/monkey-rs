@@ -24,24 +24,28 @@ pub enum Expr {
 impl Display for Expr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Identifier(s) => write!(f, "{}", s),
-            Expr::Integer(v) => write!(f, "{}", v),
-            Expr::Boolean(b) => write!(f, "{}", b),
-            Expr::Str(s) => write!(f, "{}", s),
-            Expr::Prefix(token, expr) => write!(f, "({}{})", token.to_string(), expr.to_string()),
-            Expr::Infix(left, op, right) => write!(f, "({} {} {})", left, op, right),
+            Expr::Identifier(s) => write!(f, "{s}"),
+            Expr::Integer(v) => write!(f, "{v}"),
+            Expr::Boolean(b) => write!(f, "{b}"),
+            Expr::Str(s) => write!(f, "{s}"),
+            Expr::Prefix(token, expr) => write!(f, "({token}{expr})"),
+            Expr::Infix(left, op, right) => write!(f, "({left} {op} {right})"),
             Expr::If(condition, if_block, else_block) => match else_block {
-                Some(v) => write!(f, "if {} {} else {}", condition, if_block, v),
-                None => write!(f, "if {} {}", condition, if_block),
+                Some(v) => write!(f, "if {condition} {if_block} else {v}"),
+                None => write!(f, "if {condition} {if_block}"),
             },
             Expr::Function(parameter, block) => {
                 write!(f, "fn({}) {}", pretty_print(parameter), block)
             }
             Expr::Call(name, parameter) => write!(f, "{}({})", name, pretty_print(parameter)),
             Expr::Array(content) => write!(f, "[{}]", pretty_print(content)),
-            Expr::Hash(content) => write!(f, "{}", 1),
+            Expr::Hash(content) => {
+                let pairs: Vec<String> = content.iter().map(|(k, v)| format!("{k}: {v}")).collect();
+                let pairs = pretty_print(&pairs);
+                write!(f, "{{{pairs}}}")
+            }
             Expr::Index(id, subscription) => {
-                write!(f, "({}[{}])", id.to_string(), subscription.to_string())
+                write!(f, "({id}[{subscription}])")
             }
         }
     }
@@ -78,9 +82,6 @@ impl BlockStmt {
     pub fn new() -> Self {
         Self { statements: vec![] }
     }
-    pub fn is_empty(&self) -> bool {
-        self.statements.is_empty()
-    }
 }
 
 impl Display for BlockStmt {
@@ -99,7 +100,7 @@ impl Display for Program {
             .collect::<Vec<String>>()
             .join("");
 
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
